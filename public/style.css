@@ -1,0 +1,33 @@
+body {
+    margin: 0px;
+    font-size: 22px;
+}
+
+nav {
+    display: flex;
+    align-items: center;
+
+    height: 50px;
+    width: 100vw;
+
+    background-color: grey;
+}
+
+.act * {
+    display: unset !important;
+}
+
+.editor {
+    height: calc(100vh - 50px);
+    white-space: pre;
+    padding: 10px;
+    outline: none;
+}
+
+.style >  :first-child, .style > :last-child{
+    background-color: red;
+    display: inline-block;
+    overflow-x: hidden;
+    width: 0px;
+    height: 0px;
+}
