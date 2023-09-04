@@ -145,7 +145,9 @@ function handleKeyDown(event, setOffset) {
 
         case "ArrowUp": {
             if (index === 0) return;
-            
+
+            event.preventDefault();
+
             setOffset(pre => { return {
                 focusBlock: index-1,
                 offset: Math.max(pre.offset, calParentOffset(blockElement, focusNode, focusOffset))
@@ -156,10 +158,13 @@ function handleKeyDown(event, setOffset) {
         case "ArrowDown": {
             if (index === event.target.childNodes.length - 1) return;
 
+            event.preventDefault();
+
             setOffset(pre => { return {
                 focusBlock: index+1,
                 offset: Math.max(pre.offset, calParentOffset(blockElement, focusNode, focusOffset))
             } })
+
             return;
         }
     }
@@ -177,6 +182,8 @@ function Suture(props) {
         const focusBlock = [...ref.current.childNodes][offset.focusBlock];
 
         const focus = offsetFromParent(focusBlock, offset.offset);
+
+        createRange(focus.node, focus.offset)
 
         // remove old active element
         for (let element of document.querySelectorAll(".act")) {
@@ -208,16 +215,6 @@ function Suture(props) {
             }
         }
     }, [offset])
-
-    useEffect(()=>{
-        if (!offset) return;
-
-        const focusBlock = ref.current.childNodes[offset.focusBlock];
-
-        const focus = offsetFromParent(focusBlock, offset.offset);
-
-        createRange(focus.node, focus.offset)
-    }, [plainText])
 
     return (
         <StrictMode>
