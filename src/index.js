@@ -111,7 +111,6 @@ function handleClick(setOffset) {
     // IMPORTANT
     // event.target is not same as window.getSelection().focusNode
     // To be conventional, use focusNode instead
-
     const {focusNode, focusOffset} = window.getSelection();
 
     if (focusNode.tagName === "P") return;
@@ -124,23 +123,38 @@ function handleClick(setOffset) {
     })
 }
 
-function handleKeyDown(event, setOffset) {
+function handleKeyDown(event, setOffset, setPlainText) {
     const {focusNode, focusOffset} = window.getSelection();
     const {blockElement, index} = getFocusBlockIdx(event.target, focusNode)
     
     switch (event.key) {
-        case "ArrowRight": case "ArrowLeft": {
-            setTimeout(()=>{
-                const {focusNode, focusOffset} = window.getSelection();
-                const {blockElement, index} = getFocusBlockIdx(event.target, focusNode)
-                
-                setOffset({
-                    focusBlock: index,
-                    offset: calParentOffset(blockElement, focusNode, focusOffset)
-                })
-            }, 0)
+        case "ArrowLeft": {
+            event.preventDefault();
 
-            return
+            const blockOffset = calParentOffset(blockElement, focusNode, focusOffset)-1;
+            
+            if (blockOffset >= 0) {
+                setOffset({focusBlock: index, offset: blockOffset});
+            }
+            else if (index !== 0) {
+                setOffset({focusBlock: index-1,offset: event.target.childNodes[index-1].textContent.length});
+            }
+
+            return;
+        }
+        case "ArrowRight": {
+            event.preventDefault();
+            
+            const blockOffset = calParentOffset(blockElement, focusNode, focusOffset)+1;
+            
+            if (blockOffset <= blockElement.textContent.length) {
+                setOffset({focusBlock: index, offset: blockOffset});
+            }
+            else if (index !== event.target.childNodes.length - 1) {
+                setOffset({focusBlock: index+1,offset: 0});
+            }
+
+            return;
         }
 
         case "ArrowUp": {
@@ -167,6 +181,58 @@ function handleKeyDown(event, setOffset) {
 
             return;
         }
+        case "Enter": {
+            event.preventDefault();
+
+            const {blockElement, index} = getFocusBlockIdx(event.target, window.getSelection().focusNode)
+            
+            const blockOffset = calParentOffset(blockElement, window.getSelection().focusNode, window.getSelection().focusOffset)
+
+            let plainText = []
+            let idx = 0
+            for (let child of [...event.target.childNodes]) {
+                if (idx === index) {
+                    plainText.push(child.textContent.slice(0, blockOffset));
+                    plainText.push(child.textContent.slice(blockOffset));
+                } else {
+                    plainText.push(child.textContent)
+                }
+                idx++
+            }
+            setPlainText([...parser(plainText.join("\r\n"))])
+
+            setOffset({focusBlock: index+1, offset: 0})
+            return;
+        }
+        case "Backspace": {
+            const blockOffset = calParentOffset(blockElement, focusNode, focusOffset);
+            if (focusNode.nodeType === 1 && blockOffset === 0) {
+                event.preventDefault();
+                if (index === 0) return;
+
+                let plainText = []
+                let idx = 0
+                for (let child of [...event.target.childNodes]) {
+                    if (idx === index-1) {
+                        setOffset({focusBlock: idx, offset: child.textContent.length})
+
+                        plainText.push(child.textContent + child.nextElementSibling.textContent);
+                    }
+                    // no action if idx === index, since it was merged into previous block
+                    else if (idx !== index) {
+                        plainText.push(child.textContent)
+                    }
+
+                    idx++
+                }
+
+                setPlainText([...parser(plainText.join("\r\n"))])
+    
+                return;
+
+            }
+            return;
+        }
     }
 }
 
@@ -178,11 +244,11 @@ function Suture(props) {
 
     useEffect(()=>{
         if (!offset) return;
-
+        
         const focusBlock = [...ref.current.childNodes][offset.focusBlock];
-
+        
         const focus = offsetFromParent(focusBlock, offset.offset);
-
+        
         createRange(focus.node, focus.offset)
 
         // remove old active element
@@ -225,10 +291,10 @@ function Suture(props) {
             contentEditable
             suppressContentEditableWarning
 
-            key={plainText}
+            // key={plainText}
             className="editor"
 
-            onKeyDown={e => {handleKeyDown(e, setOffset)}}
+            onKeyDown={e => {handleKeyDown(e, setOffset, setPlainText)}}
             onInput={e => {handleInput(e, setOffset, setPlainText, offset)}}
             onCompositionEnd={e => {handleInput(e ,setOffset, setPlainText, offset)}}
             onClick={()=>{handleClick(setOffset)}}
