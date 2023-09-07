@@ -101,7 +101,7 @@ function inlineHTML(plainText) {
         switch (style) {
             case "text": {
                 element.push(
-                    <span>{match.groups[style]}</span>
+                    <span key={match.groups[style]}>{match.groups[style]}</span>
                     );
                 index++;
                 continue;

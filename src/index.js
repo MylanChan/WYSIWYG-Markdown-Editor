@@ -12,22 +12,23 @@ function getTopStyleElt(child) {
     }
 }
 
-function createRange(node, offset, type="caret") {
+/**
+ * 
+ * @param {Node} focusNode 
+ * @param {number} focusOffset 
+ * @param {Node} anchorNode 
+ * @param {number} anchorOffset 
+ * @param {"Caret"|"Range"} type 
+ * @returns 
+ */
+function createRange(focusNode, focusOffset, anchorNode=null, anchorOffset=null, type="Caret") {
     const selection = window.getSelection();
-    const range = document.createRange();
     
-    if (type === "caret") {
-        // avoid offset exceed the maximum offset of block
-        if (offset > node.textContent.length) {
-            range.setStart(node, node.textContent.length);
-        } else {
-            range.setStart(node, offset);
-        }
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        
-        return;
+    // avoid offset exceed the maximum offset of block
+    if (type === "Caret") {
+        selection.setPosition(focusNode, focusOffset)
+    } else if (type === "Range") {
+        selection.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset)
     }
 }
 
@@ -64,9 +65,7 @@ function offsetFromParent(parentElement, offset) {
         return offsetFromParent(parentElement, parentElement.textContent.length)
     }
 
-    if (parentElement.nodeType === 3) {
-        return {node: parentElement, offset: offset}
-    }
+    if (parentElement.nodeType === 3) return {node: parentElement, offset: offset};
 
     for (let child of [...parentElement.childNodes]) {
         if (offset <= child.textContent.length) {
@@ -102,7 +101,7 @@ function handleInput(event, setOffset, setPlainText, offset) {
     const newOffset = calParentOffset(blockElements[index], focusNode, focusOffset)
 
     // calculate the offset with respected to block element
-    setOffset({focusBlock: index, offset: newOffset})
+    setOffset({type: "Caret", focusBlock: index, offset: newOffset})
     setPlainText([...parser(plainText)]);
 
 }
@@ -112,32 +111,76 @@ function handleClick(setOffset) {
     // event.target is not same as window.getSelection().focusNode
     // To be conventional, use focusNode instead
     const {focusNode, focusOffset} = window.getSelection();
-
-    if (focusNode.tagName === "P") return;
+    
+    if (window.getSelection().type === "Range") return;
+    
+    // trigger when plain text is empty and user keep click the block element
+    // focusNode will be div.editor rather than block element 
+    if (focusNode.nodeType === 1) {
+        if (focusNode.classList.contains("editor") || focusNode.tagName === "P") return
+    }
 
     const onTopStyle = getTopStyleElt(window.getSelection().focusNode);
 
     setOffset({
+        type: "Caret", 
         focusBlock: getFocusBlockIdx(document.querySelector(".editor"), onTopStyle.parentElement).index,
         offset: calParentOffset(onTopStyle.parentElement, focusNode, focusOffset)
     })
 }
 
 function handleKeyDown(event, setOffset, setPlainText) {
-    const {focusNode, focusOffset} = window.getSelection();
-    const {blockElement, index} = getFocusBlockIdx(event.target, focusNode)
+    const {focusNode, focusOffset, anchorNode, anchorOffset} = window.getSelection();
     
+    const blockList = event.target.childNodes
+
+    const anchor = getFocusBlockIdx(event.target, anchorNode);
+    anchor.offset = calParentOffset(anchor.blockElement, anchorNode, anchorOffset);
+
+    const focus = getFocusBlockIdx(event.target, focusNode);
+    focus.offset = calParentOffset(focus.blockElement, focusNode, focusOffset);
+
     switch (event.key) {
         case "ArrowLeft": {
             event.preventDefault();
 
-            const blockOffset = calParentOffset(blockElement, focusNode, focusOffset)-1;
-            
-            if (blockOffset >= 0) {
-                setOffset({focusBlock: index, offset: blockOffset});
-            }
-            else if (index !== 0) {
-                setOffset({focusBlock: index-1,offset: event.target.childNodes[index-1].textContent.length});
+            if (event.shiftKey) {
+                const selectionInfo = {
+                    type: "Range",
+                    anchorIndex: anchor.index,
+                    anchorOffset: anchor.offset
+                }
+
+                if (focus.offset-1 < 0) {
+                    if (focus.index === 0) return;
+                    setOffset({
+                        focusBlock: focus.index-1,
+                        offset: event.target.childNodes[focus.index-1].textContent.length,
+                        
+                        ...selectionInfo
+                    })
+                } else {
+                    setOffset({
+                        focusBlock: focus.index,
+                        offset: focus.offset-1,
+                        ...selectionInfo
+                    })
+                }
+            } else if (window.getSelection().type === "Range") {
+                // code
+            } else if (focus.offset === 0) {
+                if (focus.index === 0) return;
+                setOffset({
+                    type: "Caret",
+                    focusBlock: focus.index-1,
+                    offset: blockList[focus.index-1].textContent.length
+                })
+            } else {
+                setOffset({
+                    type: "Caret",
+                    focusBlock: focus.index,
+                    offset: focus.offset-1
+                })
             }
 
             return;
@@ -145,91 +188,212 @@ function handleKeyDown(event, setOffset, setPlainText) {
         case "ArrowRight": {
             event.preventDefault();
             
-            const blockOffset = calParentOffset(blockElement, focusNode, focusOffset)+1;
-            
-            if (blockOffset <= blockElement.textContent.length) {
-                setOffset({focusBlock: index, offset: blockOffset});
-            }
-            else if (index !== event.target.childNodes.length - 1) {
-                setOffset({focusBlock: index+1,offset: 0});
+            if (event.shiftKey) {
+                const selectionInfo = {
+                    type: "Range",
+                    anchorIndex: anchor.index,
+                    anchorOffset: anchor.offset
+                }
+
+                if (focus.offset === focus.blockElement.textContent.length) {
+                    if (focus.index === event.target.childNodes.length-1) return;
+                    setOffset({focusBlock: focus.index+1, offset: 0, ...selectionInfo})
+                } else {
+                    setOffset({focusBlock: focus.index, offset: focus.offset+1, ...selectionInfo})
+                }
+            } else if (window.getSelection().type === "Range") {
+                // code
+            } else if (focus.offset === focus.blockElement.textContent.length) {
+                if (focus.index === event.target.childNodes.length-1) return
+
+                setOffset({type: "Caret", focusBlock: focus.index+1, offset: 0})
+            } else {
+                setOffset({type: "Caret", focusBlock: focus.index, offset: focus.offset+1})
             }
 
             return;
         }
 
         case "ArrowUp": {
-            if (index === 0) return;
-
             event.preventDefault();
+            if (event.shiftKey) {
+                const selectionInfo = {
+                    type: "Range",
+                    anchorIndex: anchor.index,
+                    anchorOffset: anchor.offset                    
+                }
 
-            setOffset(pre => { return {
-                focusBlock: index-1,
-                offset: Math.max(pre.offset, calParentOffset(blockElement, focusNode, focusOffset))
-            } })
+                if (focus.index === 0) {
+                    setOffset({focusBlock: focus.index, offset: 0, ...selectionInfo});
+                } else {
+                    setOffset({focusBlock: focus.index-1, offset: focus.offset, ...selectionInfo});
+                }
+                return;
+            }
+            if (focus.index === 0) {
+                setOffset({
+                    type: "Caret",
+                    focusBlock: focus.index,
+                    offset: 0
+                })
+            } else {
+                setOffset(pre => { return {
+                    type: "Caret", 
+                    focusBlock: focus.index-1,
+                    offset: Math.max(pre.offset, focus.offset)
+                } })    
+            }
 
             return;
         }
         case "ArrowDown": {
-            if (index === event.target.childNodes.length - 1) return;
-
             event.preventDefault();
-
-            setOffset(pre => { return {
-                focusBlock: index+1,
-                offset: Math.max(pre.offset, calParentOffset(blockElement, focusNode, focusOffset))
-            } })
+            if (event.shiftKey) {
+                const selectionInfo = {
+                    type: "Range",
+                    anchorIndex: anchor.index,
+                    anchorOffset: anchor.offset
+                }
+                
+                if (focus.index === event.target.childNodes.length - 1) {
+                    setOffset({
+                        focusBlock: focus.index,
+                        offset: focus.blockElement.textContent.length,
+                        ...selectionInfo
+                    })
+                } else {
+                    setOffset({
+                        focusBlock: focus.index+1,
+                        offset: focus.offset,
+                        ...selectionInfo
+                    })
+                }
+            } else if (focus.index === event.target.childNodes.length - 1) {
+                setOffset({
+                    type: "Caret",
+                    focusBlock: focus.index,
+                    offset: focus.blockElement.textContent.length
+                })
+            } else {
+                setOffset(pre => { return {
+                    type: "Caret", 
+                    focusBlock: focus.index+1,
+                    offset: Math.max(pre.offset, focus.offset)
+                } })                
+            }
 
             return;
         }
         case "Enter": {
             event.preventDefault();
-
-            const {blockElement, index} = getFocusBlockIdx(event.target, window.getSelection().focusNode)
-            
-            const blockOffset = calParentOffset(blockElement, window.getSelection().focusNode, window.getSelection().focusOffset)
-
-            let plainText = []
-            let idx = 0
-            for (let child of [...event.target.childNodes]) {
-                if (idx === index) {
-                    plainText.push(child.textContent.slice(0, blockOffset));
-                    plainText.push(child.textContent.slice(blockOffset));
-                } else {
-                    plainText.push(child.textContent)
-                }
-                idx++
-            }
-            setPlainText([...parser(plainText.join("\r\n"))])
-
-            setOffset({focusBlock: index+1, offset: 0})
-            return;
-        }
-        case "Backspace": {
-            const blockOffset = calParentOffset(blockElement, focusNode, focusOffset);
-            if (focusNode.nodeType === 1 && blockOffset === 0) {
-                event.preventDefault();
-                if (index === 0) return;
-
+            if (window.getSelection().type === "Caret" || anchor.index === focus.index) {
                 let plainText = []
                 let idx = 0
                 for (let child of [...event.target.childNodes]) {
-                    if (idx === index-1) {
-                        setOffset({focusBlock: idx, offset: child.textContent.length})
-
-                        plainText.push(child.textContent + child.nextElementSibling.textContent);
-                    }
-                    // no action if idx === index, since it was merged into previous block
-                    else if (idx !== index) {
+                    if (idx === focus.index) {
+                        plainText.push(child.textContent.slice(0, focus.offset));
+                        plainText.push(child.textContent.slice(focus.offset));
+                    } else {
                         plainText.push(child.textContent)
                     }
-
                     idx++
                 }
-
                 setPlainText([...parser(plainText.join("\r\n"))])
     
+                setOffset({type: "Caret", focusBlock: focus.index+1, offset: 0})
                 return;
+            } else if (window.getSelection().type === "Range") {
+                let plainText = [];
+                let idx = 0;
+                if (anchor.index > focus.index) {
+                    for (let child of [...event.target.childNodes]) {
+                        if (idx === focus.index) {
+                            plainText.push(child.textContent.slice(0, focus.offset));
+                        } else if (idx > focus.index && idx < anchor.index) {
+                            
+                        } else if (idx === anchor.index) {
+                            plainText.push(child.textContent.slice(anchor.offset))
+                        } else {
+                            plainText.push(child.textContent)
+                        }
+                        idx++
+                    }
+                    setOffset({
+                        type: "Caret",
+                        focusBlock: focus.index+1,
+                        offset: 0
+                    })
+                } else {
+                    for (let [idx, child] of event.target.childNodes.entries()) {
+                        if (idx === anchor.index) {
+                            plainText.push(child.textContent.slice(0, anchor.offset));
+                        }
+                        else if (idx === focus.index) {
+                            plainText.push(child.textContent.slice(focus.offset))
+                        }
+                        else if (focus.index < idx || idx < anchor.index) {
+                            plainText.push(child.textContent)
+                        }
+                    }
 
+                    setOffset({type: "Caret", focusBlock: anchor.index+1, offset: 0})
+                }
+                
+                setPlainText([...parser(plainText.join("\r\n"))]);
+                return;
+            }
+        }
+        case "Backspace": {
+
+            if (window.getSelection().type === "Range") {
+                event.preventDefault();
+                if (anchor.index > focus.index) {
+                    let plainText = [];
+                    for (let [idx, child] of event.target.childNodes.entries()) {
+                        if (idx === focus.index) {
+                            plainText.push(child.textContent.slice(0, focus.offset));
+                            
+                        } else if (idx === anchor.index) {
+                            plainText[plainText.length-1] += child.textContent.slice(anchor.offset)
+                        
+                        } else if ( anchor.index < idx || idx < focus.index) {
+                            plainText.push(child.textContent)
+                        }
+                    }
+                    setPlainText([...parser(plainText.join("\r\n"))]);
+                    setOffset({type: "Caret", focusBlock: focus.index, offset: focus.offset});
+
+                } else if (focus.index > anchor.index) {
+                    let plainText = [];
+                    for (let [idx, child] of event.target.childNodes.entries()) {
+                        if (idx === anchor.index) {
+                            plainText.push(child.textContent.slice(0, anchor.offset));
+                        } else if (idx === focus.index) {
+                            plainText[plainText.length-1] += child.textContent.slice(focus.offset)
+                        } else if (focus.index < idx || idx < anchor.index) {
+                            plainText.push(child.textContent)
+                        }
+                    }
+
+                    setPlainText([...parser(plainText.join("\r\n"))])
+                    setOffset({type: "Caret", focusBlock: anchor.index, offset: anchor.offset});
+                }
+            } else if (window.getSelection().type === "Caret") {
+                if (focusNode.nodeType === 1 && focus.offset === 0) {
+                    event.preventDefault();
+                    if (focus.index === 0) return;
+
+                    let plainText = [];
+                    for (let [idx, child] of event.target.childNodes.entries()) {
+                        if (idx === focus.index) {
+                            plainText[idx-1] += child.textContent.slice(focus.offset)        
+                        } else { 
+                            plainText.push(child.textContent)
+                        }
+                    }
+                    setPlainText([...parser(plainText.join("\r\n"))])
+                    setOffset({type: "Caret", focusBlock: focus.index-1, offset: event.target.childNodes[focus.index-1].textContent.length});
+                }
             }
             return;
         }
@@ -244,16 +408,22 @@ function Suture(props) {
 
     useEffect(()=>{
         if (!offset) return;
-        
         const focusBlock = [...ref.current.childNodes][offset.focusBlock];
-        
         const focus = offsetFromParent(focusBlock, offset.offset);
         
-        createRange(focus.node, focus.offset)
-
+        if (offset.type === "Caret") {
+        
+            createRange(focus.node, focus.offset)
+    
+        } else if (offset.type === "Range") {
+            const anchorBlock = [...ref.current.childNodes][offset.anchorIndex];
+            const anchor = offsetFromParent(anchorBlock, offset.anchorOffset);
+            createRange(focus.node, focus.offset, anchor.node, anchor.offset, "Range")
+        }
+        
         // remove old active element
         for (let element of document.querySelectorAll(".act")) {
-           element.classList.remove("act")
+            element.classList.remove("act")
         }
 
         // find out and add new active element
