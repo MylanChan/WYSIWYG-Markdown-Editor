@@ -145,7 +145,7 @@ function handleClick(setOffset) {
 }
 
 function handleKeyDown(event, setOffset, setPlainText) {
-    const {focusNode, focusOffset, anchorNode, anchorOffset} = window.getSelection();
+    const {focusNode, anchorNode, anchorOffset} = window.getSelection();
     
     const focus = getBlockAllInfo(focusNode);
     const anchor = getBlockAllInfo(anchorNode, anchorOffset);
@@ -264,27 +264,48 @@ function handleKeyDown(event, setOffset, setPlainText) {
             return;
         }
     }
-    case "Backspace": {
+    case "Backspace": case "Delete": {
         if (window.getSelection().type === "Caret") {
-            if (focusNode.nodeType === 1 && focus.offset === 0) {
-                event.preventDefault();
-                if (focus.idx === 0) return;
-
-                let plainText = [];
-                for (let [idx, child] of event.target.childNodes.entries()) {
-                    if (idx === focus.idx) {
-                        plainText[idx-1] += child.textContent.slice(focus.offset)        
-                    } else { 
-                        plainText.push(child.textContent)
+            if (event.key === "Backspace") {
+                if (focusNode.nodeType === 1 && focus.offset === 0) {
+                    event.preventDefault();
+                    if (focus.idx === 0) return;
+    
+                    let plainText = [];
+                    for (let [idx, child] of event.target.childNodes.entries()) {
+                        if (idx === focus.idx) {
+                            plainText[idx-1] += child.textContent.slice(focus.offset)        
+                        } else { 
+                            plainText.push(child.textContent)
+                        }
                     }
-                }
-                setPlainText(plainText.join("\r\n"))
+                    setPlainText(plainText.join("\r\n"))
+                    setOffset({
+                        focus: {index: focus.idx-1, offset: focus.prev.len}
+                    });
+                } else {
+                    setTimeout(()=>{
 
-                setOffset({
-                    focus: {index: focus.idx-1, offset: focus.prev.len}
-                });
+                    }, 0)
+                }
+            } else {
+                if (focus.offset === focus.len) {
+                    event.preventDefault();
+                    let plainText = [];
+                    for (let [idx, child] of event.target.childNodes.entries()) {
+                        if (idx === focus.idx+1) {
+                            plainText[plainText.length-1] += child.textContent;
+                        } else {
+                            plainText.push(child.textContent);
+                        }
+                    }
+    
+                    setOffset({focus: {index: focus.idx, offset: focus.offset}})
+                    setPlainText(plainText.join("\r\n"))
+                }
             }
-        } else if (window.getSelection().type === "Range") {
+
+        } else if (window.getSelection().type === "Range" && focus.idx !== anchor.idx) {
             event.preventDefault();
             const earlierBlock = focus.idx < anchor.idx ? focus : anchor;
             const laterBlock = focus.idx < anchor.idx ? anchor : focus;
