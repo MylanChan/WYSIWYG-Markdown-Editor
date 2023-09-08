@@ -100,9 +100,7 @@ function inlineHTML(plainText) {
         if (!style) continue; // it may some error here
         switch (style) {
             case "text": {
-                element.push(
-                    <span key={match.groups[style]}>{match.groups[style]}</span>
-                    );
+                element.push(match.groups[style]);
                 index++;
                 continue;
             }
