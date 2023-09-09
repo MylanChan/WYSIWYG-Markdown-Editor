@@ -5,7 +5,7 @@ import { parser } from "./parser";
 function getTopStyleElt(child) {
     if (!child?.parentElement?.tagName) return undefined
 
-    if (child.parentElement.tagName === "P") {
+    if (child.parentElement.classList.contains("block")) {
         return child
     } else {
         return getTopStyleElt(child.parentElement)
@@ -18,8 +18,8 @@ function getBlockAllInfo(node, offset=window.getSelection().focusOffset) {
     return {
         parent: () => {
             return {
-                children: this.element.parentElement.childNodes,
-                nChild: this.element.parentElement.childNodes.length
+                children: document.querySelector(".editor"),
+                nChild: document.querySelector(".editor").childNodes.length
             }
         },
         element: blockElement,
@@ -32,12 +32,9 @@ function getBlockAllInfo(node, offset=window.getSelection().focusOffset) {
 
 /**
  * 
- * @param {Node} focusNode 
- * @param {number} focusOffset 
- * @param {Node} anchorNode 
- * @param {number} anchorOffset 
+ * @param {{Node, number}} focus
+ * @param {{Node, number}} anchor 
  * @param {"Caret"|"Range"} type 
- * @returns 
  */
 function createRange(focus, anchor=null) {
     const selection = window.getSelection();
@@ -96,14 +93,11 @@ function offsetFromParent(parentElement, offset) {
 }
 
 function getFocusBlockIdx(parentElement, child) {
-    let index = 0
-    for (let blockElement of [...parentElement.childNodes]) {
+    for (let [index, blockElement] of parentElement.childNodes.entries()) {
         if (blockElement.contains(child)) {
             return {blockElement, index}
         }
-        index += 1
     }
-
 }
 
 function handleInput(event, setOffset, setPlainText) {

@@ -16,8 +16,8 @@ nav {
     background-color: grey;
 }
 
-.act * {
-    display: unset !important;
+.act *, .act.delimiter {
+    display: unset !important; 
 }
 
 .editor {
@@ -27,11 +27,11 @@ nav {
     outline: none;
 }
 
-p {
+p, h1, h2, h3, h4, h5, h6 {
     margin: 0px;
 }
 
-.style >  :first-child, .style > :last-child{
+.delimiter {
     border-bottom: 2px solid red;
     display: inline-block;
     overflow-x: hidden;

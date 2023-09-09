@@ -12,24 +12,47 @@ function Paragraph(props) {
     const {innerText} = props
     
     return (
-        <p key={inlineHTML(innerText)}>{inlineHTML(innerText)}</p>
+        <p key={inlineHTML(innerText)} className="block">{inlineHTML(innerText)}</p>
     )
 }
 
+function BlockQuota(props) {
+    const {innerText} = props;
+    return (
+        <blockquote className="block">
+            <span key={Math.random()} className="delimiter">{"> "}</span>
+            {inlineHTML(innerText)}
+        </blockquote>
+    )
+}
+
+function Heading(props) {
+    const HeadTag = `h${props.del.length-1}`
+    const {innerText} = props;
+    
+    return (
+        <HeadTag className="block">
+            <span key={Math.random()} className="delimiter">{props.del}</span>
+            {inlineHTML(innerText)}
+        </HeadTag>
+    )
+}
+
+
 function TextGroup(props) {
-    const {Tag, delimiter, innerText, onClick} = props;
+    const {Tag, delimiter, innerText} = props;
 
     return (
         <Tag className="style">
-            <span key={`${Math.random()}`}>{delimiter}</span>
+            <span key={Math.random()} className="delimiter">{delimiter}</span>
             {inlineHTML(innerText)}
-            <span key={`${Math.random()}`} >{delimiter}</span>
+            <span key={Math.random()} className="delimiter">{delimiter}</span>
         </Tag>
     )
 }
 
 function blockHTML(plainText) {
-    const regex = /(?<p>(?<=^|\n).+(?=\r?\n|$))|(?<br>(?<=^|\n)\r?\n|(?<=\n)|^$)/g;
+    const regex = /(?<head>(?<=^|\n)#{1,6} .*(?=\r?\n|$))|(?<quota>(?<=^|\n)> .*(?=\r?\n|$))|(?<p>(?<=^|\n).+(?=\r?\n|$))|(?<br>(?<=^|\n)\r?\n|(?<=\n)|^$)/g;
     const matches = plainText.matchAll(regex);
 
     const element = [];
@@ -53,13 +76,24 @@ function blockHTML(plainText) {
                 i++
                 continue
             }
+            case "quota": {
+                element.push(
+                    <BlockQuota key={i} innerText={match.groups[style].slice(2)} />
+                )
+                i++;
+                continue;
+            }
+            case "head": {
+                const matched = match.groups[style].match(/(#{1,6} )(.*)/);
+                element.push(
+                    <Heading key={i} del={matched[1]} innerText={matched[2]}/>
+                )
+                i++;
+                continue;
+            }
             case "br": {
                 element.push(
-                    <p key={i}>
-                        <span key={<br/>}>
-                            <br />
-                        </span>
-                    </p>
+                    <p key={i}><br /></p>
                 )
                 i++
                 continue;
@@ -108,11 +142,7 @@ function inlineHTML(plainText) {
                 const [, prefix, innerText, postfix] = match.groups[style].match(new RegExp("("+delimiter[style].source+")" + "(.+)(" + delimiter[style].source+")"))
                 
                 element.push(
-                    <TextGroup
-                        key={index}
-                        Tag = {style}
-                        delimiter = {postfix}
-                        innerText = {innerText} />
+                    <TextGroup key={index} Tag={style} delimiter={postfix} innerText={innerText} />
                 )
                 index++;
             }
