@@ -1,5 +1,13 @@
 import {useEffect, useState} from "react";
 
+function Paragraph(props) {
+    return (
+        <p key={props.innerText}>
+            {props.innerText}
+        </p>
+    )
+}
+
 function Heading(props) {
     const {Tag, prefix, innerText} = props;
     return (
@@ -51,4 +59,4 @@ function Hr(props) {
 }
 
 
-export {BlockQuota, CheckBox, Heading, Hr}
+export {BlockQuota, CheckBox, Heading, Hr, Paragraph}

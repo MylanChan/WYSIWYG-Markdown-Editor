@@ -113,20 +113,15 @@ function getFocusBlockIdx(parentElement, child) {
 }
 
 function handleCompositionEnd(event, setOffset, setPlainText) {
-    if (event.nativeEvent.isComposing || event.nativeEvent.target.tagName === "INPUT") return
-
+    event.preventDefault();
     const blockElements = [...event.target.childNodes]
-    const {focusNode, focusOffset} = window.getSelection();
+    const {focusNode} = window.getSelection();
 
-    const plainText = blockElements.map(elt => elt.textContent);
+    const focus = getBlockAllInfo(focusNode);
+    
+    setOffset({focus: {index: focus.idx, offset: focus.offset}});
 
-    const {index} = getFocusBlockIdx(event.target, focusNode)
-    const offset = calParentOffset(blockElements[index], focusNode, focusOffset)
-
-    // calculate the offset with respected to block element
-    setOffset({focus: {index, offset}});
-    setPlainText(plainText);
-
+    setPlainText(blockElements.map(e=>e.textContent))
 }
 
 function handleClick(event, setOffset) {

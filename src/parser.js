@@ -1,6 +1,6 @@
 import React from "react";
 import {Image} from "./Components/Markdown/Style"
-import {BlockQuota, CheckBox, Heading, Hr} from "./Components/Markdown/Block";
+import {BlockQuota, CheckBox, Heading, Hr, Paragraph} from "./Components/Markdown/Block";
 
 /**
  * Markdown syntax To HTML Tag
@@ -21,9 +21,10 @@ function blockHTML(plainText) {
         switch (Type) {
         case "p": {
             return (
-                <p key={index} className="block">
-                    {inlineHTML(rawText)}
-                </p>
+                <Paragraph
+                    key={index}
+                    innerText={inlineHTML(rawText)}
+                />
             )
         }
         case "check": {
