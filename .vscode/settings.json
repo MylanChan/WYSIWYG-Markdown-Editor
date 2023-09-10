@@ -1,4 +1,11 @@
 {
     "editor.rulers": [100],
-    "editor.wordWrapColumn":100
+    "editor.wordWrapColumn":100,
+    "liveSassCompile.settings.formats": [
+        {
+            "format": "expanded",
+            "extensionName": ".css",
+            "savePath": "~../../public",
+        }
+    ]
 }

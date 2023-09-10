@@ -1,40 +1,58 @@
 body {
-    margin: 0px;
-    font-size: 22px;
-    max-width: 100vw;
-    max-height: 100vh;
+  margin: 0px;
+  font-size: 22px;
+  max-width: 100vw;
+  max-height: 100vh;
 }
 
 nav {
-    display: flex;
-    align-items: center;
-
-    height: 50px;
-    max-width: 100%;
-    padding: 0px 10px;
-
-    background-color: grey;
-}
-
-.act *, .act.delimiter {
-    display: unset !important; 
-}
-
-.editor {
-    max-height: calc(100vh - 50px);
-    white-space: pre;
-    padding: 10px;
-    outline: none;
+  display: flex;
+  align-items: center;
+  height: 50px;
+  max-width: 100%;
+  padding: 0px 10px;
+  background-color: grey;
 }
 
 p, h1, h2, h3, h4, h5, h6 {
-    margin: 0px;
+  margin: 0px;
 }
 
-.delimiter {
-    border-bottom: 2px solid red;
-    display: inline-block;
-    overflow-x: hidden;
-    width: 0px;
-    height: 0px;
+.editor {
+  max-height: calc(100vh - 50px);
+  white-space: pre;
+  padding: 10px;
+  outline: none;
 }
+.editor > h1 :first-child:not(.act), .editor > h2 :first-child:not(.act), .editor > h3 :first-child:not(.act), .editor > h4 :first-child:not(.act), .editor > h5 :first-child:not(.act), .editor > h6 :first-child:not(.act) {
+  display: none;
+}
+.editor > p:has(input:first-child):has(.act:nth-child(2)) :first-child {
+  display: none;
+}
+.editor > p:has(input:first-child):has(.act:nth-child(2)) :nth-child(2) {
+  display: unset;
+}
+.editor > p:has(input:first-child):not(:has(.act:nth-child(2))) :nth-child(2) {
+  display: none;
+}
+.editor > * {
+  min-height: 30px;
+}
+.editor > * :not(:has(span:first-child):has(span:last-child)):not(.act) :not(:first-child) {
+  display: none;
+}
+.editor > * :not(:has(span:first-child):has(span:last-child)):not(.act) > img {
+  display: block;
+  max-width: 100%;
+  min-height: 30px;
+}
+.editor > * :not(:has(span:first-child):has(span:last-child)).act :first-child {
+  display: none;
+}
+.editor > * :has(span:first-child):has(span:last-child):not(.act):not(:first-child:last-child) :first-child, .editor > * :has(span:first-child):has(span:last-child):not(.act):not(:first-child:last-child) :last-child {
+  display: inline-block;
+  overflow-x: hidden;
+  width: 0px;
+  height: 0px;
+}/*# sourceMappingURL=style.css.map */
