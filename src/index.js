@@ -12,14 +12,28 @@ function getTopStyleElt(child) {
     }
 }
 
+function splitTwo(text, offset, preMove=0, laterMove=0) {
+    return [text.slice(0, offset+preMove), text.slice(offset+laterMove)]
+}
+
+function arraySplice(array, ...args) {
+    array.splice(...args)
+    return array;
+}
+
+function strSplice(str, ...args) {
+    let strList = str.split("");
+    return arraySplice(strList, ...args).join("");
+}
 
 function getBlockAllInfo(node, offset=window.getSelection().focusOffset) {
-    const {blockElement, index} = getFocusBlockIdx(document.querySelector(".editor"), node);
+    const editor = document.querySelector(".editor");
+    const {blockElement, index} = getFocusBlockIdx(editor, node);
     return {
         parent: () => {
             return {
-                children: document.querySelector(".editor"),
-                nChild: document.querySelector(".editor").childNodes.length
+                children: editor,
+                nChild: editor.childNodes.length
             }
         },
         element: blockElement,
@@ -31,10 +45,8 @@ function getBlockAllInfo(node, offset=window.getSelection().focusOffset) {
 }
 
 /**
- * 
  * @param {{Node, number}} focus
- * @param {{Node, number}} anchor 
- * @param {"Caret"|"Range"} type 
+ * @param {{Node, number}} anchor
  */
 function createRange(focus, anchor=null) {
     const selection = window.getSelection();
@@ -100,19 +112,19 @@ function getFocusBlockIdx(parentElement, child) {
     }
 }
 
-function handleInput(event, setOffset, setPlainText) {
+function handleCompositionEnd(event, setOffset, setPlainText) {
     if (event.nativeEvent.isComposing || event.nativeEvent.target.tagName === "INPUT") return
 
     const blockElements = [...event.target.childNodes]
     const {focusNode, focusOffset} = window.getSelection();
 
-    const plainText = blockElements.map(elt => elt.textContent).join("\r\n");
+    const plainText = blockElements.map(elt => elt.textContent);
 
     const {index} = getFocusBlockIdx(event.target, focusNode)
     const offset = calParentOffset(blockElements[index], focusNode, focusOffset)
 
     // calculate the offset with respected to block element
-    setOffset({type: "Caret", focus: {index, offset}});
+    setOffset({focus: {index, offset}});
     setPlainText(plainText);
 
 }
@@ -130,7 +142,7 @@ function handleClick(event, setOffset) {
     // trigger when plain text is empty and user keep click the block element
     // focusNode will be div.editor rather than block element 
     if (focusNode.nodeType === 1) {
-        if (focusNode.classList.contains("editor") || focusNode.tagName === "P") return
+        if (focusNode.classList.contains("editor") || focusNode.parentElement.classList.contains("editor")) return
     }
 
     const {blockElement, index} = getFocusBlockIdx(document.querySelector(".editor"), focusNode)
@@ -146,21 +158,28 @@ function handleKeyDown(event, setOffset, setPlainText) {
     const focus = getBlockAllInfo(focusNode);
     const anchor = getBlockAllInfo(anchorNode, anchorOffset);
 
-    if (event.key.length === 1) {
+    if (event.key.length === 1 && !event.ctrlKey && !event.shiftKey) {
         event.preventDefault();
-        let plainText = [];
-        for (let [idx, child] of event.target.childNodes.entries()) {
-            if (idx === focus.idx) {
-                plainText.push(child.textContent.slice(0, focus.offset)+
-                    event.key + child.textContent.slice(focus.offset)
-                );
-            } else {
-                plainText.push(child.textContent);
-            }
+        if (window.getSelection().type === "Caret") {
+            setOffset({focus: {index: focus.idx, offset: focus.offset+1}})
+        
+            setPlainText(pre => {
+                const replaceText = strSplice(pre[focus.idx], focus.offset, 0, event.key)
+                return arraySplice(pre, focus.idx, 1, replaceText)
+            })
+        } else {
+            const earlierBlock = focus.idx < anchor.idx ? focus : anchor;
+            const laterBlock = focus.idx < anchor.idx ? anchor : focus;
+                
+            setPlainText(pre => {
+                return arraySplice(pre, earlierBlock.idx, laterBlock.idx-earlierBlock.idx+1,
+                    pre[earlierBlock.idx].slice(0, earlierBlock.offset) + event.key + pre[laterBlock.idx].slice(laterBlock.offset)
+                )
+            });
+            setOffset({
+                focus: {index: earlierBlock.idx, offset: earlierBlock.offset+1}
+            });
         }
-        setOffset({focus: {index: focus.idx, offset: focus.offset+1}})
-        setPlainText(plainText.join("\r\n"))
-
         return;
     }
 
@@ -242,39 +261,24 @@ function handleKeyDown(event, setOffset, setPlainText) {
     case "Enter": {
         event.preventDefault();
         if (window.getSelection().type === "Caret" || anchor.idx === focus.idx) {
-            let plainText = []
-            for (let [idx, child] of event.target.childNodes.entries()) {
-                if (idx === focus.idx) {
-                    plainText.push(child.textContent.slice(0, focus.offset));
-                    plainText.push(child.textContent.slice(focus.offset));
-                } else {
-                    plainText.push(child.textContent)
-                }
-            }
-            setPlainText(plainText.join("\r\n"))
+            setPlainText(pre => {
+                return arraySplice(pre, focus.idx, 1, ...splitTwo(pre[focus.idx], focus.offset))
+            })
 
             setOffset({focus:{index: focus.idx+1, offset: 0}})
             return;
         } else if (window.getSelection().type === "Range") {
-            let plainText = [];
             const earlierBlock = focus.idx < anchor.idx ? focus : anchor;
             const laterBlock = focus.idx < anchor.idx ? anchor : focus;
                 
-            for (let [idx, child] of event.target.childNodes.entries()) {
-                if (idx === earlierBlock.idx) {
-                    plainText.push(child.textContent.slice(0, earlierBlock.offset));
-
-                } else if (idx === laterBlock.idx) {
-                    plainText.push(child.textContent.slice(laterBlock.offset));
-
-                } else if (idx < earlierBlock.idx || idx > laterBlock.idx) {
-                    plainText.push(child.textContent);
-                }
-            }
-
             setOffset({focus: {index: earlierBlock.idx+1, offset: 0}});
-        
-            setPlainText(plainText.join("\r\n"));
+            
+            setPlainText(pre => {
+                return arraySplice(pre, earlierBlock.idx, laterBlock.idx-earlierBlock.idx+1,
+                    pre[earlierBlock.idx].slice(0, earlierBlock.offset), pre[laterBlock.idx].slice(laterBlock.offset)
+                )
+            });
+
             return;
         }
     }
@@ -285,32 +289,20 @@ function handleKeyDown(event, setOffset, setPlainText) {
                     event.preventDefault();
                     if (focus.idx === 0) return;
     
-                    let plainText = [];
-                    for (let [idx, child] of event.target.childNodes.entries()) {
-                        if (idx === focus.idx) {
-                            plainText[idx-1] += child.textContent.slice(focus.offset)        
-                        } else { 
-                            plainText.push(child.textContent)
-                        }
-                    }
-                    setPlainText(plainText.join("\r\n"))
+                    setPlainText(array => {
+                        return arraySplice(array, focus.idx-1, 2, pre[focus.idx-1] + pre[focus.idx])
+                    })
+
                     setOffset({
                         focus: {index: focus.idx-1, offset: focus.prev.len}
                     });
                 } else {
                     event.preventDefault();
-                    let plainText = [];
-                    for (let [idx, child] of event.target.childNodes.entries()) {
-                        if (idx === focus.idx) {
-                            plainText.push(
-                                child.textContent.slice(0, focus.offset-1) +
-                                child.textContent.slice(focus.offset)
-                            );
-                        } else {
-                            plainText.push(child.textContent)
-                        }
-                    }
-                    setPlainText(plainText.join('\r\n'));
+                    setPlainText(pre => {
+                        pre.splice(focus.idx, 1, strSplice(pre[focus.idx], focus.offset-1, 1, ""))
+                        return pre;
+                    });
+
                     setOffset({
                         focus: {index: focus.idx, offset: focus.offset-1}
                     })
@@ -318,17 +310,11 @@ function handleKeyDown(event, setOffset, setPlainText) {
             } else {
                 if (focus.offset === focus.len) {
                     event.preventDefault();
-                    let plainText = [];
-                    for (let [idx, child] of event.target.childNodes.entries()) {
-                        if (idx === focus.idx+1) {
-                            plainText[plainText.length-1] += child.textContent;
-                        } else {
-                            plainText.push(child.textContent);
-                        }
-                    }
-    
+
                     setOffset({focus: {index: focus.idx, offset: focus.offset}})
-                    setPlainText(plainText.join("\r\n"))
+                    setPlainText(pre => {
+                        return arraySplice(pre, focus.idx, 2, pre[focus.idx]+pre[focus.idx+1])
+                    })
                 }
             }
 
@@ -337,19 +323,11 @@ function handleKeyDown(event, setOffset, setPlainText) {
             const earlierBlock = focus.idx < anchor.idx ? focus : anchor;
             const laterBlock = focus.idx < anchor.idx ? anchor : focus;
                 
-            let plainText = [];
-            for (let [idx, child] of event.target.childNodes.entries()) {
-                if (idx === earlierBlock.idx) {
-                    plainText.push(child.textContent.slice(0, earlierBlock.offset));
-                    
-                } else if (idx === laterBlock.idx) {
-                    plainText[plainText.length-1] += child.textContent.slice(laterBlock.offset)
-                
-                } else if (laterBlock.idx < idx || idx < earlierBlock.idx) {
-                    plainText.push(child.textContent)
-                }
-            }
-            setPlainText(plainText.join("\r\n"));
+            setPlainText(pre => {
+                return arraySplice(pre, earlierBlock.idx, laterBlock.idx-earlierBlock.idx+1,
+                    pre[earlierBlock.idx].slice(0, earlierBlock.offset) + pre[laterBlock.idx].slice(laterBlock.offset)
+                )
+            });
             setOffset({
                 focus: {index: earlierBlock.idx, offset: earlierBlock.offset}
             });
@@ -361,7 +339,7 @@ function handleKeyDown(event, setOffset, setPlainText) {
 }
 
 function Suture(props) {
-    const [plainText, setPlainText] = useState("");
+    const [plainText, setPlainText] = useState([""]);
 
     const [selection, setOffset] = useState(null);
     const ref = useRef();
@@ -425,10 +403,10 @@ function Suture(props) {
             className="editor"
 
             onKeyDown={e => {handleKeyDown(e, setOffset, setPlainText)}}
-            onCompositionEnd={e => {handleInput(e ,setOffset, setPlainText)}}
+            onCompositionEnd={e => {handleCompositionEnd(e ,setOffset, setPlainText)}}
             onClick={(e)=>{handleClick(e, setOffset)}}
         >
-            {parser(plainText)}
+            {parser(plainText.join("\r\n"))}
         </div>
         </StrictMode>
     )

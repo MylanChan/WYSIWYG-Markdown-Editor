@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import {Image} from "./Components/Markdown/Style"
 import {BlockQuota, CheckBox, Heading, Hr} from "./Components/Markdown/Block";
 
@@ -79,6 +79,7 @@ function inlineHTML(plainText) {
 
     return [...plainText.matchAll(regex)].map((match, index)=>{
         const Style = Object.keys(match.groups).filter(a => match.groups[a] !== undefined)[0];
+        const rawText = match.groups[Style];
 
         switch (Style) {
         case "text": {
