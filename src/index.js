@@ -5,7 +5,7 @@ import { parser } from "./parser";
 function getTopStyleElt(child) {
     if (!child?.parentElement?.tagName) return undefined
 
-    if (child.parentElement.classList.contains("block")) {
+    if (child.parentElement.parentElement.classList.contains("editor")) {
         return child
     } else {
         return getTopStyleElt(child.parentElement)
@@ -101,7 +101,7 @@ function getFocusBlockIdx(parentElement, child) {
 }
 
 function handleInput(event, setOffset, setPlainText) {
-    if (event.nativeEvent?.isComposing) return
+    if (event.nativeEvent.isComposing || event.nativeEvent.target.tagName === "INPUT") return
 
     const blockElements = [...event.target.childNodes]
     const {focusNode, focusOffset} = window.getSelection();
@@ -117,12 +117,14 @@ function handleInput(event, setOffset, setPlainText) {
 
 }
 
-function handleClick(setOffset) {
+function handleClick(event, setOffset) {
     // IMPORTANT
     // event.target is not same as window.getSelection().focusNode
     // To be conventional, use focusNode instead
     const {focusNode, focusOffset} = window.getSelection();
-    
+    if (event.target.nodeType === 1 && event.target.tagName === "INPUT") {
+        return
+    }
     if (window.getSelection().type === "Range") return;
     
     // trigger when plain text is empty and user keep click the block element
@@ -143,6 +145,24 @@ function handleKeyDown(event, setOffset, setPlainText) {
     
     const focus = getBlockAllInfo(focusNode);
     const anchor = getBlockAllInfo(anchorNode, anchorOffset);
+
+    if (event.key.length === 1) {
+        event.preventDefault();
+        let plainText = [];
+        for (let [idx, child] of event.target.childNodes.entries()) {
+            if (idx === focus.idx) {
+                plainText.push(child.textContent.slice(0, focus.offset)+
+                    event.key + child.textContent.slice(focus.offset)
+                );
+            } else {
+                plainText.push(child.textContent);
+            }
+        }
+        setOffset({focus: {index: focus.idx, offset: focus.offset+1}})
+        setPlainText(plainText.join("\r\n"))
+
+        return;
+    }
 
     switch (event.key) {
     case "ArrowLeft": {
@@ -278,9 +298,22 @@ function handleKeyDown(event, setOffset, setPlainText) {
                         focus: {index: focus.idx-1, offset: focus.prev.len}
                     });
                 } else {
-                    setTimeout(()=>{
-
-                    }, 0)
+                    event.preventDefault();
+                    let plainText = [];
+                    for (let [idx, child] of event.target.childNodes.entries()) {
+                        if (idx === focus.idx) {
+                            plainText.push(
+                                child.textContent.slice(0, focus.offset-1) +
+                                child.textContent.slice(focus.offset)
+                            );
+                        } else {
+                            plainText.push(child.textContent)
+                        }
+                    }
+                    setPlainText(plainText.join('\r\n'));
+                    setOffset({
+                        focus: {index: focus.idx, offset: focus.offset-1}
+                    })
                 }
             } else {
                 if (focus.offset === focus.len) {
@@ -392,9 +425,8 @@ function Suture(props) {
             className="editor"
 
             onKeyDown={e => {handleKeyDown(e, setOffset, setPlainText)}}
-            onInput={e => {handleInput(e, setOffset, setPlainText)}}
             onCompositionEnd={e => {handleInput(e ,setOffset, setPlainText)}}
-            onClick={()=>{handleClick(setOffset)}}
+            onClick={(e)=>{handleClick(e, setOffset)}}
         >
             {parser(plainText)}
         </div>
