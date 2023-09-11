@@ -80,6 +80,7 @@ function calParentOffset(parentElement, child, focusOffset=0) {
  * @returns {{node: Node, offset: number}} 
  */
 function offsetFromParent(parentElement, offset) {
+    if (parentElement === undefined) return;
     // at the start of paragraph
     if (parentElement.nodeType === 1 && offset === 0) {
         return {node: parentElement, offset: 0}
@@ -112,245 +113,73 @@ function getFocusBlockIdx(parentElement, child) {
     }
 }
 
-function handleCompositionEnd(event, setOffset, setPlainText) {
-    event.preventDefault();
-    const blockElements = [...event.target.childNodes]
-    const {focusNode} = window.getSelection();
-
-    const focus = getBlockAllInfo(focusNode);
-    
-    setOffset({focus: {index: focus.idx, offset: focus.offset}});
-
-    setPlainText(blockElements.map(e=>e.textContent))
-}
-
-function handleClick(event, setOffset) {
-    // IMPORTANT
-    // event.target is not same as window.getSelection().focusNode
-    // To be conventional, use focusNode instead
-    const {focusNode, focusOffset} = window.getSelection();
-    if (event.target.nodeType === 1 && event.target.tagName === "INPUT") {
-        return
-    }
-    if (window.getSelection().type === "Range") return;
-    
-    // trigger when plain text is empty and user keep click the block element
-    // focusNode will be div.editor rather than block element 
-    if (focusNode.nodeType === 1) {
-        if (focusNode.classList.contains("editor") || focusNode.parentElement.classList.contains("editor")) return
+class Suture extends React.Component{
+    constructor(props) {
+        super(props);
+        this.state = {
+            blocks: [""],
+            selection: null
+        }
+        this.ref = React.createRef(null)
     }
 
-    const {blockElement, index} = getFocusBlockIdx(document.querySelector(".editor"), focusNode)
-
-    setOffset({
-        focus: {index: index, offset: calParentOffset(blockElement, focusNode, focusOffset)}
-    })
-}
-
-function handleKeyDown(event, setOffset, setPlainText) {
-    const {focusNode, anchorNode, anchorOffset} = window.getSelection();
     
-    const focus = getBlockAllInfo(focusNode);
-    const anchor = getBlockAllInfo(anchorNode, anchorOffset);
+    handleCompositionEnd(event) {
+        const blockElements = [...event.target.childNodes]
+        const {focusNode} = window.getSelection();
 
-    if (event.key.length === 1 && !event.ctrlKey && !event.shiftKey) {
-        event.preventDefault();
-        if (window.getSelection().type === "Caret") {
-            setOffset({focus: {index: focus.idx, offset: focus.offset+1}})
+        const focus = getBlockAllInfo(focusNode);
         
-            setPlainText(pre => {
-                const replaceText = strSplice(pre[focus.idx], focus.offset, 0, event.key)
-                return arraySplice(pre, focus.idx, 1, replaceText)
-            })
-        } else {
-            const earlierBlock = focus.idx < anchor.idx ? focus : anchor;
-            const laterBlock = focus.idx < anchor.idx ? anchor : focus;
-                
-            setPlainText(pre => {
-                return arraySplice(pre, earlierBlock.idx, laterBlock.idx-earlierBlock.idx+1,
-                    pre[earlierBlock.idx].slice(0, earlierBlock.offset) + event.key + pre[laterBlock.idx].slice(laterBlock.offset)
-                )
-            });
-            setOffset({
-                focus: {index: earlierBlock.idx, offset: earlierBlock.offset+1}
-            });
-        }
-        return;
+        this.setState({
+            blocks: blockElements.map(e=>e.textContent),
+            focus: {
+                index: focus.idx,
+                offset: focus.offset
+            },
+            anchor: null
+        })
     }
 
-    switch (event.key) {
-    case "ArrowLeft": {
-        event.preventDefault();
-        if (focus.offset === 0) {
-            if (focus.idx === 0) return;
-            
-            setOffset({
-                focus: {index: focus.idx-1, offset: focus.prev.len},
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            });
-
-        } else if (window.getSelection().type === "Range" && !event.shiftKey) {
-            // code 
-        } else {
-            setOffset({
-                focus: {index: focus.idx, offset: focus.offset-1},
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            })
+    handleClick(event) {
+        // IMPORTANT
+        // event.target is not same as window.getSelection().focusNode
+        // To be conventional, use focusNode instead
+        const {focusNode, focusOffset} = window.getSelection();
+        if (event.target.nodeType === 1 && event.target.tagName === "INPUT") {
+            return
         }
-
-        return;
-    }
-    case "ArrowRight": {
-        event.preventDefault();
+        if (window.getSelection().type === "Range") return;
         
-        if (window.getSelection().type === "Range" && !event.shiftKey) {
-            // code
-        } else if (focus.offset === focus.len) {
-            if (focus.idx === focus.parent().nChild-1) return
-
-            setOffset({
-                focus: {index: focus.idx+1, offset: 0},
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            })
-        } else {
-            setOffset({
-                focus: {index: focus.idx, offset: focus.offset+1},
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            })
+        // trigger when plain text is empty and user keep click the block element
+        // focusNode will be div.editor rather than block element 
+        if (focusNode.nodeType === 1) {
+            if (focusNode.classList.contains("editor") || focusNode.parentElement.classList.contains("editor")) return
         }
 
-        return;
+        const {blockElement, index} = getFocusBlockIdx(document.querySelector(".editor"), focusNode)
+
+        this.setState({
+            focus: {
+                index: index,
+                offset: calParentOffset(blockElement, focusNode, focusOffset)
+            },
+            anchor: null
+        })
     }
 
-    case "ArrowUp": {
-        event.preventDefault();
-        if (focus.idx === 0) {
-            setOffset({
-                focus: {index: focus.idx, offset: 0},
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            })
-        } else {
-            setOffset(pre => ({
-                focus: {index: focus.idx-1, offset: Math.max(pre.focus.offset, focus.offset)},
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            }))    
-        }
-
-        return;
-    }
-    case "ArrowDown": {
-        event.preventDefault();
-        if (focus.idx === event.target.childNodes.length - 1) {
-            setOffset({
-                focus: {index: focus.idx, offset: focus.len},
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            })
-        } else {
-            setOffset(pre => ({
-                focus: {index: focus.idx+1, offset: Math.max(pre.focus.offset, focus.offset)},
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            }))                
-        }
-        return;
-    }
-    case "Enter": {
-        event.preventDefault();
-        if (window.getSelection().type === "Caret" || anchor.idx === focus.idx) {
-            setPlainText(pre => {
-                return arraySplice(pre, focus.idx, 1, ...splitTwo(pre[focus.idx], focus.offset))
-            })
-
-            setOffset({focus:{index: focus.idx+1, offset: 0}})
-            return;
-        } else if (window.getSelection().type === "Range") {
-            const earlierBlock = focus.idx < anchor.idx ? focus : anchor;
-            const laterBlock = focus.idx < anchor.idx ? anchor : focus;
-                
-            setOffset({focus: {index: earlierBlock.idx+1, offset: 0}});
-            
-            setPlainText(pre => {
-                return arraySplice(pre, earlierBlock.idx, laterBlock.idx-earlierBlock.idx+1,
-                    pre[earlierBlock.idx].slice(0, earlierBlock.offset), pre[laterBlock.idx].slice(laterBlock.offset)
-                )
-            });
-
-            return;
-        }
-    }
-    case "Backspace": case "Delete": {
-        if (window.getSelection().type === "Caret") {
-            if (event.key === "Backspace") {
-                if (focusNode.nodeType === 1 && focus.offset === 0) {
-                    event.preventDefault();
-                    if (focus.idx === 0) return;
-    
-                    setPlainText(array => {
-                        return arraySplice(array, focus.idx-1, 2, pre[focus.idx-1] + pre[focus.idx])
-                    })
-
-                    setOffset({
-                        focus: {index: focus.idx-1, offset: focus.prev.len}
-                    });
-                } else {
-                    event.preventDefault();
-                    setPlainText(pre => {
-                        pre.splice(focus.idx, 1, strSplice(pre[focus.idx], focus.offset-1, 1, ""))
-                        return pre;
-                    });
-
-                    setOffset({
-                        focus: {index: focus.idx, offset: focus.offset-1}
-                    })
-                }
-            } else {
-                if (focus.offset === focus.len) {
-                    event.preventDefault();
-
-                    setOffset({focus: {index: focus.idx, offset: focus.offset}})
-                    setPlainText(pre => {
-                        return arraySplice(pre, focus.idx, 2, pre[focus.idx]+pre[focus.idx+1])
-                    })
-                }
-            }
-
-        } else if (window.getSelection().type === "Range" && focus.idx !== anchor.idx) {
-            event.preventDefault();
-            const earlierBlock = focus.idx < anchor.idx ? focus : anchor;
-            const laterBlock = focus.idx < anchor.idx ? anchor : focus;
-                
-            setPlainText(pre => {
-                return arraySplice(pre, earlierBlock.idx, laterBlock.idx-earlierBlock.idx+1,
-                    pre[earlierBlock.idx].slice(0, earlierBlock.offset) + pre[laterBlock.idx].slice(laterBlock.offset)
-                )
-            });
-            setOffset({
-                focus: {index: earlierBlock.idx, offset: earlierBlock.offset}
-            });
-            
-        }
-        return;
-    }
-    }
-}
-
-function Suture(props) {
-    const [plainText, setPlainText] = useState([""]);
-
-    const [selection, setOffset] = useState(null);
-    const ref = useRef();
-
-    useEffect(()=>{
-        if (!selection) return;
-        const focusBlock = ref.current.childNodes[selection.focus.index];
-        const focus = offsetFromParent(focusBlock, selection.focus.offset);
+    componentDidUpdate() {
+        let {focus, anchor} = this.state
+        const blockElts = this.ref.current.childNodes
+        if (!focus) return;
         
-        if (!selection.anchor) {
-            createRange(focus)
-    
-        } else {
-            const anchorBlock = ref.current.childNodes[selection.anchor.index];
-            const anchor = offsetFromParent(anchorBlock, selection.anchor.offset);
-            createRange(focus, anchor)
+        const focusSel = offsetFromParent(blockElts[focus.index], focus.offset);
+
+        if (!anchor) {
+            createRange(focusSel)
+        }
+        else {
+            const anchorSel = offsetFromParent(blockElts[anchor.index], anchor.offset);
+            createRange(focusSel, anchorSel)
         }
         
         // remove old active element
@@ -359,54 +188,279 @@ function Suture(props) {
         }
 
         // find out and add new active element
-        for (let innerElt of [...focusBlock.childNodes]) {
-            if (innerElt.contains(focus.node) || innerElt === focus.node) {
+        for (let innerElt of [...blockElts[focus.index].childNodes]) {
+            if (innerElt.contains(focusSel.node) || innerElt === focusSel.node) {
                 if (innerElt.nodeType === 1) innerElt.classList.add("act")
                 break;
             }
         }
 
         // handle which element should be a plain text
-        if (focus.node) {
-            // most cases, e.g. input character / left-right caret movement
-            if (focus.node.nodeType === 3) {
-                const styleParent = getTopStyleElt(focus.node);
+        if (focusSel.node) {
+            if (focusSel.node.nodeType === 3) {
+                const styleParent = getTopStyleElt(focusSel.node);
                 const {textContent, nextSibling} = styleParent;
 
-                if (calParentOffset(styleParent, focus.node, focus.offset) === textContent.length) {
+                if (calParentOffset(styleParent, focusSel.node, focusSel.offset) === textContent.length) {
                     if (nextSibling && nextSibling.nodeType === 1) {
                         nextSibling.classList.add("act");
                     }
                 }
             }
             // Handle caret and offset when Input Enter
-            else if (focus.node.nodeType === 1 && focus.node.firstChild.nodeType === 1) {
-                focus.node.firstChild.classList.add("act")
+            else if (focusSel.node.nodeType === 1 && focusSel.node.firstChild.nodeType === 1) {
+                focusSel.node.firstChild.classList.add("act")
+            }
+        }        
+    }
+
+    handleKeyDown(event) {
+        const {blocks} = this.state;
+        
+        const {type, focusNode, anchorNode, anchorOffset} = window.getSelection();
+        const focus = getBlockAllInfo(focusNode);
+        const anchor = getBlockAllInfo(anchorNode, anchorOffset);
+        
+        if (event.key.length === 1 && !event.ctrlKey) {
+            event.preventDefault();
+            if (type === "Caret") {
+                const replaceElt = strSplice(blocks[focus.idx], focus.offset, 0, event.key)
+                this.setState({
+                    blocks: arraySplice(blocks, focus.idx, 1, replaceElt),
+                    focus: {
+                        index: focus.idx,
+                        offset: focus.offset+1
+                    },
+                    anchor: null
+                })
+            }
+            else if (focus.idx === anchor.idx) {
+                this.setState(pre => {
+                    const replaceElt = blocks[focus.idx].slice(0, Math.min(focus.offset, anchor.offset)) + event.key + blocks[focus.idx].slice(Math.max(focus.offset, anchor.offset))
+                    return {
+                        blocks: arraySplice(blocks, focus.idx, 1, replaceElt),
+                        focus: {index: focus.idx, offset: Math.min(focus.offset, anchor.offset)+1},
+                        anchor: null
+                    }
+                })
+            }
+            else {
+                const earlier = focus.idx < anchor.idx ? focus : anchor;
+                const later = focus.idx < anchor.idx ? anchor : focus;
+                
+                this.setState(pre => {
+                    const replaceElt = blocks[earlier.idx].slice(0, earlier.offset) + event.key + blocks[later.idx].slice(later.offset)
+                    return {
+                        blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt),
+                        focus: {index: earlier.idx, offset: earlier.offset+1},
+                        anchor: null
+                    }
+                })
+            }
+            return;
+        }
+        switch (event.key) {
+        case "ArrowLeft": {
+            event.preventDefault();
+            if (focus.offset === 0) {
+                if (focus.idx === 0) return;
+                this.setState({
+                    focus: {index: focus.idx-1, offset: focus.prev.len},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
+                })   
+            } else if (window.getSelection().type === "Range" && !event.shiftKey) {
+                const earlier = focus.idx < anchor.idx ? focus : anchor;
+                
+                this.setState({
+                    focus: {index: earlier.idx, offset: earlier.offset},
+                    anchor: null
+                })
+            } else {
+                this.setState({
+                    focus: {index: focus.idx, offset: focus.offset-1},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
+                })
+            }
+    
+            return;
+        }
+        case "ArrowRight": {
+            event.preventDefault();
+            
+            if (window.getSelection().type === "Range" && !event.shiftKey) {
+                const later = focus.idx < anchor.idx ? anchor : focus;
+                
+                this.setState({
+                    focus: {index: later.idx, offset: later.offset},
+                    anchor: null
+                })
+            } else if (focus.offset === focus.len) {
+                if (focus.idx === focus.parent().nChild-1) return
+                this.setState({
+                    focus: {index: focus.idx+1, offset: 0},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
+                })
+            } else {
+                this.setState({
+                    focus: {index: focus.idx, offset: focus.offset+1},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
+                })
+            }
+    
+            return;
+        }
+        case "ArrowUp": {
+            event.preventDefault();
+            if (focus.idx === 0) {
+                this.setState({
+                    focus: {index: focus.idx, offset: 0},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
+                })
+            } else {
+                this.setState(pre => ({
+                    focus: {index: focus.idx-1, offset: Math.max(pre.focus.offset, focus.offset)},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
+                }))
+            }
+    
+            return;
+        }
+        case "ArrowDown": {
+            event.preventDefault();
+            if (focus.idx === event.target.childNodes.length - 1) {
+                this.setState({
+                    focus: {index: focus.idx, offset: focus.len},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
+                })
+            } else {
+                this.setState(pre => ({
+                    focus: {index: focus.idx+1, offset: Math.max(pre.focus.offset, focus.offset)},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
+                }))
+            }
+            return;
+        }
+        case "Enter": {
+            event.preventDefault();
+            if (type === "Caret" || anchor.idx === focus.idx) {
+                const replaceElt = splitTwo(blocks[focus.idx], focus.offset);
+                this.setState({
+                    blocks: arraySplice(blocks, focus.idx, 1, ...replaceElt),
+                    focus: {
+                        index: focus.idx+1,
+                        offset: 0
+                    },
+                    anchor: null
+                })
+    
+                return;
+            }
+            else if (type === "Range") {
+                const earlier = focus.idx < anchor.idx ? focus : anchor;
+                const later = focus.idx < anchor.idx ? anchor : focus;
+                
+                const replaceElt = [
+                    blocks[earlier.idx].slice(0, earlier.offset),
+                    blocks[later.idx].slice(later.offset)
+                ]
+
+                this.setState({
+                    blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, ...replaceElt),
+                    focus: {
+                        index: earlier.idx+1,
+                        offset: 0
+                    },
+                    anchor: null
+                })
+                
+                return;
             }
         }
-    }, [selection])
+        case "Backspace": case "Delete": {
+            if (window.getSelection().type === "Caret") {
+                if (event.key === "Backspace") {
+                    if (focusNode.nodeType === 1 && focus.offset === 0 && blocks[focus.idx-1]) {
+                        event.preventDefault();
+                        if (focus.idx === 0) return;
+                        
+                        this.setState({
+                            blocks: arraySplice(blocks, focus.idx-1, 2, blocks[focus.idx-1]+blocks[focus.idx]),
+                            focus: {index: focus.idx-1, offset: focus.prev.len},
+                            anchor: null
+                        })
+                    } else {
+                        event.preventDefault();
+                        this.setState({
+                            blocks: arraySplice(blocks, focus.idx, 1, strSplice(blocks[focus.idx], focus.offset-1, 1, "")),
+                            focus: {index: focus.idx, offset: focus.offset-1},
+                            anchor: null
 
-    return (
-        <StrictMode>
-        <nav>Suture Editor</nav>
+                        })
+                    }
+                } else {
+                    if (focus.offset === focus.len && blocks[focus.idx+1]) {
+                        event.preventDefault();
+                        this.setState(pre => ({
+                            blocks: arraySplice(blocks, focus.idx, 2, blocks[focus.idx]+blocks[focus.idx+1]),
+                            focus: {index: focus.idx, offset: focus.offset},
+                            anchor: null
 
-        <div
-            ref={ref}
-            contentEditable
-            suppressContentEditableWarning
-
-            className="editor"
-
-            onKeyDown={e => {handleKeyDown(e, setOffset, setPlainText)}}
-            onCompositionEnd={e => {handleCompositionEnd(e ,setOffset, setPlainText)}}
-            onClick={(e)=>{handleClick(e, setOffset)}}
-        >
-            {parser(plainText.join("\r\n"))}
-        </div>
-        </StrictMode>
-    )
+                        }))
+                    }
+                }
+    
+            } 
+            else {
+                event.preventDefault();
+                if (focus.idx === anchor.idx) {
+                    this.setState(pre => {
+                        const replaceElt = blocks[focus.idx].slice(0, Math.min(focus.offset, anchor.offset)) + blocks[focus.idx].slice(Math.max(focus.offset, anchor.offset))
+                        return {
+                            blocks: arraySplice(blocks, focus.idx, 1, replaceElt),
+                            focus: {index: focus.idx, offset: Math.min(focus.offset, anchor.offset)},
+                            anchor: null
+                        }
+                    })
+                } else {
+                    const earlier = focus.idx < anchor.idx ? focus : anchor;
+                    const later = focus.idx < anchor.idx ? anchor : focus;
+                    
+                    this.setState(pre => {
+                        const replaceElt = blocks[earlier.idx].slice(0, earlier.offset) + blocks[later.idx].slice(later.offset)
+                        return {
+                            blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt),
+                            focus: {index: earlier.idx, offset: earlier.offset},
+                            anchor: null
+                        }
+                    })
+                }
+            }
+            return;
+        }
+        }
+    }
+       render() {
+        return (
+            <StrictMode>
+            <nav>Suture Editor</nav>
+    
+            <div
+                ref={this.ref}
+                contentEditable
+                suppressContentEditableWarning
+    
+                className="editor"
+    
+                onKeyDown={this.handleKeyDown.bind(this)}
+                onCompositionEnd={this.handleCompositionEnd.bind(this)}
+                onClick={this.handleClick.bind(this)}
+            >
+                {parser(this.state.blocks.join("\r\n"))}
+            </div>
+            </StrictMode>
+        )
+    }
 }
-
 
 const app = ReactDOM.createRoot(document.querySelector("#app"));
 app.render(<Suture />);
