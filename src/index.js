@@ -1,6 +1,6 @@
-import React, { StrictMode, useEffect, useRef, useState } from "react";
+import React, {StrictMode} from "react";
 import ReactDOM from "react-dom/client";
-import { parser } from "./parser";
+import {parser} from "./parser";
 
 function getTopStyleElt(child) {
     if (!child?.parentElement?.tagName) return undefined
@@ -167,52 +167,6 @@ class Suture extends React.Component{
         })
     }
 
-    componentDidUpdate() {
-        let {focus, anchor} = this.state
-        const blockElts = this.ref.current.childNodes
-        if (!focus) return;
-        
-        const focusSel = offsetFromParent(blockElts[focus.index], focus.offset);
-
-        if (!anchor) {
-            createRange(focusSel)
-        }
-        else {
-            const anchorSel = offsetFromParent(blockElts[anchor.index], anchor.offset);
-            createRange(focusSel, anchorSel)
-        }
-        
-        // remove old active element
-        for (let element of document.querySelectorAll(".act")) {
-            element.classList.remove("act")
-        }
-
-        // find out and add new active element
-        for (let innerElt of [...blockElts[focus.index].childNodes]) {
-            if (innerElt.contains(focusSel.node) || innerElt === focusSel.node) {
-                if (innerElt.nodeType === 1) innerElt.classList.add("act")
-                break;
-            }
-        }
-
-        // handle which element should be a plain text
-        if (focusSel.node) {
-            if (focusSel.node.nodeType === 3) {
-                const styleParent = getTopStyleElt(focusSel.node);
-                const {textContent, nextSibling} = styleParent;
-
-                if (calParentOffset(styleParent, focusSel.node, focusSel.offset) === textContent.length) {
-                    if (nextSibling && nextSibling.nodeType === 1) {
-                        nextSibling.classList.add("act");
-                    }
-                }
-            }
-            // Handle caret and offset when Input Enter
-            else if (focusSel.node.nodeType === 1 && focusSel.node.firstChild.nodeType === 1) {
-                focusSel.node.firstChild.classList.add("act")
-            }
-        }        
-    }
 
     handleKeyDown(event) {
         const {blocks} = this.state;
@@ -220,7 +174,6 @@ class Suture extends React.Component{
         const {type, focusNode, anchorNode, anchorOffset} = window.getSelection();
         const focus = getBlockAllInfo(focusNode);
         const anchor = getBlockAllInfo(anchorNode, anchorOffset);
-        
         if (event.key.length === 1 && !event.ctrlKey) {
             event.preventDefault();
             if (type === "Caret") {
@@ -260,6 +213,16 @@ class Suture extends React.Component{
             return;
         }
         switch (event.key) {
+        case "a": {
+            if (event.ctrlKey) {
+                event.preventDefault();
+                this.setState({
+                    focus: {index: 0, offset: 0},
+                    anchor: {index: blocks.length-1, offset: blocks[blocks.length-1].length}
+                });
+            }
+            return;
+        }
         case "ArrowLeft": {
             event.preventDefault();
             if (focus.offset === 0) {
@@ -269,12 +232,19 @@ class Suture extends React.Component{
                     anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
                 })   
             } else if (window.getSelection().type === "Range" && !event.shiftKey) {
-                const earlier = focus.idx < anchor.idx ? focus : anchor;
-                
-                this.setState({
-                    focus: {index: earlier.idx, offset: earlier.offset},
-                    anchor: null
-                })
+                if (focus.idx === anchor.idx) {
+                    const earlier = focus.offset < anchor.offset ? focus : anchor
+                    this.setState({
+                        focus: {index: earlier.idx, offset: earlier.offset},
+                        anchor: null
+                    })
+                } else {
+                    const earlier = focus.idx < anchor.idx ? focus : anchor;
+                    this.setState({
+                        focus: {index: earlier.idx, offset: earlier.offset},
+                        anchor: null
+                    })
+                }
             } else {
                 this.setState({
                     focus: {index: focus.idx, offset: focus.offset-1},
@@ -288,12 +258,20 @@ class Suture extends React.Component{
             event.preventDefault();
             
             if (window.getSelection().type === "Range" && !event.shiftKey) {
-                const later = focus.idx < anchor.idx ? anchor : focus;
+                if (focus.idx === anchor.idx) {
+                    const later = focus.offset < anchor.offset ? anchor : focus
+                    this.setState({
+                        focus: {index: later.idx, offset: later.offset},
+                        anchor: null
+                    })
+                } else {
+                    const later = focus.idx < anchor.idx ? anchor : focus;
                 
-                this.setState({
-                    focus: {index: later.idx, offset: later.offset},
-                    anchor: null
-                })
+                    this.setState({
+                        focus: {index: later.idx, offset: later.offset},
+                        anchor: null
+                    })
+                }
             } else if (focus.offset === focus.len) {
                 if (focus.idx === focus.parent().nChild-1) return
                 this.setState({
@@ -439,7 +417,61 @@ class Suture extends React.Component{
         }
         }
     }
-       render() {
+
+    componentDidUpdate() {
+        let {focus, anchor} = this.state
+        const blockElts = this.ref.current.childNodes
+        const focusSel = offsetFromParent(blockElts[focus.index], focus.offset);
+
+        const detectActSiblings = (sel) => {
+            if (sel.node.nodeType === 1) {
+                return [sel.node.firstChild]
+            }
+            else if (sel.node.nodeType === 3) {
+                const styleParent = getTopStyleElt(sel.node);
+                const innerOffset = calParentOffset(styleParent, sel.node, sel.offset);
+                
+                if (innerOffset === styleParent.textContent.length && styleParent.nextSibling) {
+                    return [styleParent, styleParent.nextSibling]
+                }
+                return [styleParent]
+            }
+
+            return [];
+        }
+
+        let active = [];
+        if (anchor) {
+            const anchorSel = offsetFromParent(blockElts[anchor.index], anchor.offset);
+            createRange(focusSel, anchorSel);
+            active.push(...detectActSiblings(anchorSel));
+        }
+        else {
+            createRange(focusSel)
+        }
+
+        for (let i=Math.min(focus.index, anchor?.index); i<=Math.max(focus.index, anchor?.index); i++) {
+            for (let child of this.ref.current.childNodes[i].childNodes) {
+                if (window.getSelection().containsNode(child, true)) {
+                    active.push(child)
+                }       
+            }
+        } 
+        
+        active.push(...detectActSiblings(focusSel));
+
+        for (let element of document.querySelectorAll(".act")) {
+            if (!active.includes(element)) {
+                element.classList.remove("act")
+            } else {
+                active.splice(active.findIndex(e=>e===element), 1)
+            }
+        }
+
+        active.forEach(elt => elt.classList.add("act"))
+    }
+    
+    render() {
         return (
             <StrictMode>
             <nav>Suture Editor</nav>

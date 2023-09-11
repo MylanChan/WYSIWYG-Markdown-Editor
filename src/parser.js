@@ -85,7 +85,7 @@ function inlineHTML(plainText) {
         switch (Style) {
         case "text": {
             return (
-                <span key={index}>
+                <span className="style" key={index}>
                     {match.groups[Style]}
                 </span>
             )
@@ -115,7 +115,7 @@ function inlineHTML(plainText) {
             const [, prefix, innerText, postfix] = match.groups[Style].match(new RegExp("("+delimiter[Style].source+")" + "(.+)(" + delimiter[Style].source+")"))
             
             return (
-                <Style key={index}>
+                <Style key={index} className="style">
                     <span>{prefix}</span>
                     {
                         Style === "code"

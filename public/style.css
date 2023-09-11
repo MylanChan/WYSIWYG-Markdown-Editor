@@ -50,7 +50,7 @@ p, h1, h2, h3, h4, h5, h6 {
 .editor > * :not(:has(span:first-child):has(span:last-child)).act :first-child {
   display: none;
 }
-.editor > * :has(span:first-child):has(span:last-child):not(.act):not(:first-child:last-child) :first-child, .editor > * :has(span:first-child):has(span:last-child):not(.act):not(:first-child:last-child) :last-child {
+.editor > * > .style:not(.act) :first-child, .editor > * > .style:not(.act) :last-child {
   display: inline-block;
   overflow-x: hidden;
   width: 0px;
