@@ -118,7 +118,8 @@ class Suture extends React.Component{
         super(props);
         this.state = {
             blocks: [""],
-            selection: null
+            selection: null,
+            undo: []
         }
         this.ref = React.createRef(null)
     }
@@ -130,13 +131,20 @@ class Suture extends React.Component{
 
         const focus = getBlockAllInfo(focusNode);
         
+        let undo = [...this.state.undo];
+        undo.push({
+            blocks: [...this.state.blocks],
+            focus: this.state.focus ? {...this.state.focus} : {index: 0, offset: 0},
+        })
+
         this.setState({
             blocks: blockElements.map(e=>e.textContent),
             focus: {
                 index: focus.idx,
                 offset: focus.offset
             },
-            anchor: null
+            anchor: null,
+            undo
         })
     }
 
@@ -176,6 +184,14 @@ class Suture extends React.Component{
         const anchor = getBlockAllInfo(anchorNode, anchorOffset);
         if (event.key.length === 1 && !event.ctrlKey) {
             event.preventDefault();
+            let undo = [...this.state.undo];
+            undo.push({
+                blocks: [...this.state.blocks],
+                focus: this.state.focus ? {...this.state.focus} : {index: 0, offset: 0},
+            })
+
+            this.setState({undo: undo})
+
             if (type === "Caret") {
                 const replaceElt = strSplice(blocks[focus.idx], focus.offset, 0, event.key)
                 this.setState({
@@ -188,13 +204,12 @@ class Suture extends React.Component{
                 })
             }
             else if (focus.idx === anchor.idx) {
-                this.setState(pre => {
-                    const replaceElt = blocks[focus.idx].slice(0, Math.min(focus.offset, anchor.offset)) + event.key + blocks[focus.idx].slice(Math.max(focus.offset, anchor.offset))
-                    return {
-                        blocks: arraySplice(blocks, focus.idx, 1, replaceElt),
-                        focus: {index: focus.idx, offset: Math.min(focus.offset, anchor.offset)+1},
-                        anchor: null
-                    }
+                const replaceElt = blocks[focus.idx].slice(0, Math.min(focus.offset, anchor.offset)) + event.key + blocks[focus.idx].slice(Math.max(focus.offset, anchor.offset))
+                
+                this.setState({
+                    blocks: arraySplice(blocks, focus.idx, 1, replaceElt),
+                    focus: {index: focus.idx, offset: Math.min(focus.offset, anchor.offset)+1},
+                    anchor: null,
                 })
             }
             else {
@@ -223,15 +238,20 @@ class Suture extends React.Component{
             }
             return;
         }
+        case "z": {
+            if (event.ctrlKey) {
+                event.preventDefault();
+                console.log({...this.state.undo[this.state.undo.length-1]})
+                this.setState({
+                    ...this.state.undo[this.state.undo.length-1],
+                    undo: arraySplice(this.state.undo, this.state.undo.length-1, 1)
+                })
+            }
+            return;
+        }
         case "ArrowLeft": {
             event.preventDefault();
-            if (focus.offset === 0) {
-                if (focus.idx === 0) return;
-                this.setState({
-                    focus: {index: focus.idx-1, offset: focus.prev.len},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-                })   
-            } else if (window.getSelection().type === "Range" && !event.shiftKey) {
+            if (type === "Range" && !event.shiftKey) {
                 if (focus.idx === anchor.idx) {
                     const earlier = focus.offset < anchor.offset ? focus : anchor
                     this.setState({
@@ -245,7 +265,15 @@ class Suture extends React.Component{
                         anchor: null
                     })
                 }
-            } else {
+            }
+            else if (focus.offset === 0) {
+                    if (focus.idx === 0) return;
+                    this.setState({
+                        focus: {index: focus.idx-1, offset: focus.prev.len},
+                        anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
+                    })   
+                }
+            else {
                 this.setState({
                     focus: {index: focus.idx, offset: focus.offset-1},
                     anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
@@ -320,6 +348,13 @@ class Suture extends React.Component{
         }
         case "Enter": {
             event.preventDefault();
+            let undo = [...this.state.undo];
+            undo.push({
+                blocks: [...this.state.blocks],
+                focus: this.state.focus ? {...this.state.focus} : {index: 0, offset: 0},
+            })
+
+            this.setState({undo: undo})
             if (type === "Caret" || anchor.idx === focus.idx) {
                 const replaceElt = splitTwo(blocks[focus.idx], focus.offset);
                 this.setState({
@@ -355,6 +390,13 @@ class Suture extends React.Component{
             }
         }
         case "Backspace": case "Delete": {
+            let undo = [...this.state.undo];
+            undo.push({
+                blocks: [...this.state.blocks],
+                focus: this.state.focus ? {...this.state.focus} : {index: 0, offset: 0},
+            })
+
+            this.setState({undo: undo})
             if (window.getSelection().type === "Caret") {
                 if (event.key === "Backspace") {
                     if (focusNode.nodeType === 1 && focus.offset === 0 && blocks[focus.idx-1]) {
