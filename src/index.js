@@ -153,7 +153,7 @@ class Suture extends React.Component{
         // event.target is not same as window.getSelection().focusNode
         // To be conventional, use focusNode instead
         const {focusNode, focusOffset} = window.getSelection();
-        if (event.target.nodeType === 1 && event.target.tagName === "INPUT") {
+        if (event.target.nodeType === 1 && (event.target.tagName === "INPUT" || event.target.parentElement.tagName === "A")) {
             return
         }
         if (window.getSelection().type === "Range") return;
@@ -408,7 +408,7 @@ class Suture extends React.Component{
             this.setState({undo: undo})
             if (window.getSelection().type === "Caret") {
                 if (event.key === "Backspace") {
-                    if (focusNode.nodeType === 1 && focus.offset === 0 && blocks[focus.idx-1]) {
+                    if (focusNode.nodeType === 1 && focus.offset === 0) {
                         event.preventDefault();
                         if (focus.idx === 0) return;
                         
@@ -469,6 +469,18 @@ class Suture extends React.Component{
         }
     }
 
+    handleSelect(event) {
+        if (event.nativeEvent instanceof MouseEvent) {
+            const {focusNode, anchorNode, anchorOffset} = window.getSelection();
+            const focus = getBlockAllInfo(focusNode);
+            const anchor = getBlockAllInfo(anchorNode, anchorOffset);
+
+            this.setState({
+                focus: {index: focus.idx, offset: focus.offset},
+                anchor: {index: anchor.idx, offset: anchor.offset}
+            })
+        }
+    }
     componentDidUpdate() {
         let {focus, anchor} = this.state
         const blockElts = this.ref.current.childNodes
@@ -537,6 +549,7 @@ class Suture extends React.Component{
                 onKeyDown={this.handleKeyDown.bind(this)}
                 onCompositionEnd={this.handleCompositionEnd.bind(this)}
                 onClick={this.handleClick.bind(this)}
+                onSelect={this.handleSelect.bind(this)}
             >
                 {parser(this.state.blocks.join("\r\n"))}
             </div>

@@ -24,35 +24,40 @@ p, h1, h2, h3, h4, h5, h6 {
   padding: 10px;
   outline: none;
 }
-.editor > h1 :first-child:not(.act), .editor > h2 :first-child:not(.act), .editor > h3 :first-child:not(.act), .editor > h4 :first-child:not(.act), .editor > h5 :first-child:not(.act), .editor > h6 :first-child:not(.act) {
-  display: none;
-}
-.editor > p:has(input:first-child):has(.act:nth-child(2)) :first-child {
-  display: none;
-}
-.editor > p:has(input:first-child):has(.act:nth-child(2)) :nth-child(2) {
-  display: unset;
-}
-.editor > p:has(input:first-child):not(:has(.act:nth-child(2))) :nth-child(2) {
-  display: none;
-}
 .editor > * {
   min-height: 30px;
-}
-.editor > * :not(:has(span:first-child):has(span:last-child)):not(.act) :not(:first-child) {
-  display: none;
-}
-.editor > * :not(:has(span:first-child):has(span:last-child)):not(.act) > img {
-  display: block;
-  max-width: 100%;
-  min-height: 30px;
-}
-.editor > * :not(:has(span:first-child):has(span:last-child)).act :first-child {
-  display: none;
 }
 .editor > * > .style:not(.act) :first-child, .editor > * > .style:not(.act) :last-child {
   display: inline-block;
   overflow-x: hidden;
   width: 0px;
   height: 0px;
+}
+
+p:has(input[type=checkbox]:first-child):has(input + span.act) > :first-child, p:has(input[type=checkbox]:first-child) > :first-child.act {
+  display: none;
+}
+p:has(input[type=checkbox]:first-child) > input:not(.act) + span:not(.act) {
+  display: inline-block;
+  overflow-x: hidden;
+  width: 0px;
+  height: 0px;
+}
+
+h1 > :first-child:not(.act), h2 > :first-child:not(.act), h3 > :first-child:not(.act), h4 > :first-child:not(.act), h5 > :first-child:not(.act), h6 > :first-child:not(.act), blockquote > :first-child:not(.act) {
+  display: none;
+}
+
+p > span:has(hr).act > hr {
+  display: none;
+}
+p > span:has(hr):not(.act) > span {
+  display: none;
+}
+
+span:has(img).act > img {
+  display: none;
+}
+span:has(img):not(.act) > :not(img) {
+  display: none;
 }/*# sourceMappingURL=style.css.map */

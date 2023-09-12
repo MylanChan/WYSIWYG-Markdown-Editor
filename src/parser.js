@@ -85,7 +85,7 @@ function inlineHTML(plainText) {
         switch (Style) {
         case "text": {
             return (
-                <span className="style" key={index}>
+                <span key={index}>
                     {match.groups[Style]}
                 </span>
             )
@@ -104,7 +104,12 @@ function inlineHTML(plainText) {
         case "link": {
             const matched = match.groups[Style].match(/(\[)(.*)(\]\((.+)\))/)
             return (
-                <a key={index} href={matched[4]}>
+                <a
+                    key={index}
+                    href={matched[4]}
+                    className="style"
+                    onClick={()=>{window.location.href = "https://"+matched[4]}}
+                >
                     <span>{matched[1]}</span>
                     <span>{matched[2]}</span>
                     <span>{matched[3]}</span>

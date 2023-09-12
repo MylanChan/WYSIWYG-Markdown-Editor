@@ -26,49 +26,8 @@ p, h1, h2, h3, h4, h5, h6 {
     padding: 10px;
     outline: none;
 
-    > h1, > h2, > h3, > h4, > h5, > h6 {
-        :first-child:not(.act) {
-            display: none;
-        }
-    }
-    
-    > p:has(input:first-child) {
-        &:has(.act:nth-child(2)) {
-            :first-child {
-                display: none;
-            }
-            :nth-child(2) {
-                display: unset;
-            }
-        }
-        &:not(:has(.act:nth-child(2))) {
-            :nth-child(2) {
-                display: none;
-            }
-        }
-    }
-
     > * {
         min-height: 30px;
-
-        :not(:has(span:first-child):has(span:last-child)) {
-            &:not(.act) {
-                :not(:first-child) {
-                    display: none;
-                }
-                > img {
-                    display: block;
-                    max-width: 100%;
-                    min-height: 30px;
-                }
-            }
-            &.act {
-                :first-child {
-                    display: none;
-                }
-            }
-        }
-
         > .style:not(.act) {
             :first-child, :last-child {
                 display: inline-block;
@@ -77,5 +36,42 @@ p, h1, h2, h3, h4, h5, h6 {
                 height: 0px;
             }
         }
+    }
+}
+
+p:has(input[type=checkbox]:first-child) {
+    &:has(input + span.act) > :first-child, > :first-child.act {
+        display: none;
+    }
+    
+    > input:not(.act) + span:not(.act) {
+        display: inline-block;
+        overflow-x: hidden;
+        width: 0px;
+        height: 0px;
+    }
+}
+
+h1, h2, h3, h4, h5, h6, blockquote {
+    > :first-child:not(.act) {
+        display: none
+    }
+}
+
+p > span:has(hr) {
+    &.act > hr {
+        display: none
+    }
+    &:not(.act) > span {
+        display: none
+    }
+}
+
+span:has(img) {
+    &.act > img {
+        display: none;
+    }
+    &:not(.act) > :not(img) {
+        display: none
     }
 }
