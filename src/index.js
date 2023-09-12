@@ -355,7 +355,7 @@ class Suture extends React.Component{
             })
 
             this.setState({undo: undo})
-            if (type === "Caret" || anchor.idx === focus.idx) {
+            if (type === "Caret") {
                 const replaceElt = splitTwo(blocks[focus.idx], focus.offset);
                 this.setState({
                     blocks: arraySplice(blocks, focus.idx, 1, ...replaceElt),
@@ -369,22 +369,31 @@ class Suture extends React.Component{
                 return;
             }
             else if (type === "Range") {
-                const earlier = focus.idx < anchor.idx ? focus : anchor;
-                const later = focus.idx < anchor.idx ? anchor : focus;
                 
-                const replaceElt = [
-                    blocks[earlier.idx].slice(0, earlier.offset),
-                    blocks[later.idx].slice(later.offset)
-                ]
-
-                this.setState({
-                    blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, ...replaceElt),
-                    focus: {
-                        index: earlier.idx+1,
-                        offset: 0
-                    },
-                    anchor: null
-                })
+                if (focus.idx === anchor.idx) {
+                    this.setState(pre => {
+                        const replaceElt = [blocks[focus.idx].slice(0, Math.min(focus.offset, anchor.offset)), blocks[focus.idx].slice(Math.max(focus.offset, anchor.offset))]
+                        
+                        return {
+                            blocks: arraySplice(blocks, focus.idx, 1, ...replaceElt),
+                            focus: {index: focus.idx, offset: Math.min(focus.offset, anchor.offset)},
+                            anchor: null
+                        }
+                    })
+                } else {
+                    const earlier = focus.idx < anchor.idx ? focus : anchor;
+                    const later = focus.idx < anchor.idx ? anchor : focus;
+                    
+                    this.setState(pre => {
+                        const replaceElt = [blocks[earlier.idx].slice(0, earlier.offset), blocks[later.idx].slice(later.offset)]
+                        
+                        return {
+                            blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, ...replaceElt),
+                            focus: {index: earlier.idx+1, offset: 0},
+                            anchor: null
+                        }
+                    })
+                }
                 
                 return;
             }
@@ -516,7 +525,7 @@ class Suture extends React.Component{
     render() {
         return (
             <StrictMode>
-            <nav>Suture Editor</nav>
+            <nav>WYSIWYG Markdown Editor</nav>
     
             <div
                 ref={this.ref}
