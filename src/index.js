@@ -2,18 +2,30 @@ import React, {StrictMode} from "react";
 import ReactDOM from "react-dom/client";
 import {parser} from "./parser";
 
+function compareBaseExtendPos(focus, anchor) {
+    if (focus.idx === anchor.idx) {
+        if (focus.offset < anchor.offset) {
+            return [focus, anchor]
+        } else {
+            return [anchor, focus]
+        }
+    } else {
+        if (focus.idx < anchor.idx) {
+            return [focus, anchor]
+        } else {
+            return [anchor, focus]
+        }
+    }
+}
+
 function getTopStyleElt(child) {
-    if (!child?.parentElement?.tagName) return undefined
+    if (!child.parentElement.tagName) return null
 
     if (child.parentElement.parentElement.classList.contains("editor")) {
         return child
     } else {
         return getTopStyleElt(child.parentElement)
     }
-}
-
-function splitTwo(text, offset, preMove=0, laterMove=0) {
-    return [text.slice(0, offset+preMove), text.slice(offset+laterMove)]
 }
 
 function arraySplice(array, ...args) {
@@ -73,12 +85,6 @@ function calParentOffset(parentElement, child, focusOffset=0) {
     }
 }
 
-/**
- * 
- * @param {Node} parentElement 
- * @param {number} offset 
- * @returns {{node: Node, offset: number}} 
- */
 function offsetFromParent(parentElement, offset) {
     if (parentElement === undefined) return;
     // at the start of paragraph
@@ -123,26 +129,18 @@ class Suture extends React.Component{
         }
         this.ref = React.createRef(null)
     }
-
     
     handleCompositionEnd(event) {
         const blockElements = [...event.target.childNodes]
-        const {focusNode} = window.getSelection();
 
-        const focus = getBlockAllInfo(focusNode);
+        const focus = getBlockAllInfo(window.getSelection().focusNode);
         
         let undo = [...this.state.undo];
-        undo.push({
-            blocks: [...this.state.blocks],
-            focus: this.state.focus ? {...this.state.focus} : {index: 0, offset: 0},
-        })
+        undo.push({blocks: [...this.state.blocks], focus: this.state.focus})
 
         this.setState({
             blocks: blockElements.map(e=>e.textContent),
-            focus: {
-                index: focus.idx,
-                offset: focus.offset
-            },
+            focus: {index: focus.idx, offset: focus.offset},
             anchor: null,
             undo
         })
@@ -153,7 +151,7 @@ class Suture extends React.Component{
         // event.target is not same as window.getSelection().focusNode
         // To be conventional, use focusNode instead
         const {focusNode, focusOffset} = window.getSelection();
-        if (event.target.nodeType === 1 && (event.target.tagName === "INPUT" || event.target.parentElement.tagName === "A")) {
+        if (event.target.nodeType === 1 && event.target.tagName === "INPUT") {
             return
         }
         if (window.getSelection().type === "Range") return;
@@ -182,49 +180,23 @@ class Suture extends React.Component{
         const {type, focusNode, anchorNode, anchorOffset} = window.getSelection();
         const focus = getBlockAllInfo(focusNode);
         const anchor = getBlockAllInfo(anchorNode, anchorOffset);
+
         if (event.key.length === 1 && !event.ctrlKey) {
             event.preventDefault();
+            
             let undo = [...this.state.undo];
-            undo.push({
-                blocks: [...this.state.blocks],
-                focus: this.state.focus ? {...this.state.focus} : {index: 0, offset: 0},
+            undo.push({blocks: [...this.state.blocks], focus: this.state.focus});
+
+            const [earlier, later] = compareBaseExtendPos(focus, anchor)
+            
+            const replaceElt = blocks[earlier.idx].slice(0, earlier.offset) + event.key + blocks[later.idx].slice(later.offset)
+
+            this.setState({
+                blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt),
+                focus: {index: earlier.idx, offset: earlier.offset+1},
+                anchor: null,
+                undo: undo
             })
-
-            this.setState({undo: undo})
-
-            if (type === "Caret") {
-                const replaceElt = strSplice(blocks[focus.idx], focus.offset, 0, event.key)
-                this.setState({
-                    blocks: arraySplice(blocks, focus.idx, 1, replaceElt),
-                    focus: {
-                        index: focus.idx,
-                        offset: focus.offset+1
-                    },
-                    anchor: null
-                })
-            }
-            else if (focus.idx === anchor.idx) {
-                const replaceElt = blocks[focus.idx].slice(0, Math.min(focus.offset, anchor.offset)) + event.key + blocks[focus.idx].slice(Math.max(focus.offset, anchor.offset))
-                
-                this.setState({
-                    blocks: arraySplice(blocks, focus.idx, 1, replaceElt),
-                    focus: {index: focus.idx, offset: Math.min(focus.offset, anchor.offset)+1},
-                    anchor: null,
-                })
-            }
-            else {
-                const earlier = focus.idx < anchor.idx ? focus : anchor;
-                const later = focus.idx < anchor.idx ? anchor : focus;
-                
-                this.setState(pre => {
-                    const replaceElt = blocks[earlier.idx].slice(0, earlier.offset) + event.key + blocks[later.idx].slice(later.offset)
-                    return {
-                        blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt),
-                        focus: {index: earlier.idx, offset: earlier.offset+1},
-                        anchor: null
-                    }
-                })
-            }
             return;
         }
         switch (event.key) {
@@ -241,7 +213,6 @@ class Suture extends React.Component{
         case "z": {
             if (event.ctrlKey) {
                 event.preventDefault();
-                console.log({...this.state.undo[this.state.undo.length-1]})
                 this.setState({
                     ...this.state.undo[this.state.undo.length-1],
                     undo: arraySplice(this.state.undo, this.state.undo.length-1, 1)
@@ -251,32 +222,27 @@ class Suture extends React.Component{
         }
         case "ArrowLeft": {
             event.preventDefault();
+
+            this.setState({
+                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
+            })
+            
             if (type === "Range" && !event.shiftKey) {
-                if (focus.idx === anchor.idx) {
-                    const earlier = focus.offset < anchor.offset ? focus : anchor
-                    this.setState({
-                        focus: {index: earlier.idx, offset: earlier.offset},
-                        anchor: null
-                    })
-                } else {
-                    const earlier = focus.idx < anchor.idx ? focus : anchor;
-                    this.setState({
-                        focus: {index: earlier.idx, offset: earlier.offset},
-                        anchor: null
-                    })
-                }
+                const [earlier,] = compareBaseExtendPos(focus, anchor)
+
+                this.setState({
+                    focus: {index: earlier.idx, offset: earlier.offset},
+                })
             }
             else if (focus.offset === 0) {
-                    if (focus.idx === 0) return;
-                    this.setState({
-                        focus: {index: focus.idx-1, offset: focus.prev.len},
-                        anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-                    })   
-                }
+                if (focus.idx === 0) return;
+                this.setState({
+                    focus: {index: focus.idx-1, offset: focus.prev.len},
+                })   
+            }
             else {
                 this.setState({
                     focus: {index: focus.idx, offset: focus.offset-1},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
                 })
             }
     
@@ -284,24 +250,16 @@ class Suture extends React.Component{
         }
         case "ArrowRight": {
             event.preventDefault();
-            
-            if (window.getSelection().type === "Range" && !event.shiftKey) {
-                if (focus.idx === anchor.idx) {
-                    const later = focus.offset < anchor.offset ? anchor : focus
-                    this.setState({
-                        focus: {index: later.idx, offset: later.offset},
-                        anchor: null
-                    })
-                } else {
-                    const later = focus.idx < anchor.idx ? anchor : focus;
-                
-                    this.setState({
-                        focus: {index: later.idx, offset: later.offset},
-                        anchor: null
-                    })
-                }
+
+            if (type === "Range" && !event.shiftKey) {
+                const [, later] = compareBaseExtendPos(focus, anchor)
+
+                this.setState({
+                    focus: {index: later.idx, offset: later.offset},
+                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
+                })
             } else if (focus.offset === focus.len) {
-                if (focus.idx === focus.parent().nChild-1) return
+                if (focus.idx === this.ref.current.childNodes.length-1) return
                 this.setState({
                     focus: {index: focus.idx+1, offset: 0},
                     anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
@@ -327,7 +285,7 @@ class Suture extends React.Component{
                     focus: {index: focus.idx-1, offset: Math.max(pre.focus.offset, focus.offset)},
                     anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
                 }))
-            }
+            } 
     
             return;
         }
@@ -348,122 +306,73 @@ class Suture extends React.Component{
         }
         case "Enter": {
             event.preventDefault();
-            let undo = [...this.state.undo];
-            undo.push({
-                blocks: [...this.state.blocks],
-                focus: this.state.focus ? {...this.state.focus} : {index: 0, offset: 0},
-            })
 
-            this.setState({undo: undo})
-            if (type === "Caret") {
-                const replaceElt = splitTwo(blocks[focus.idx], focus.offset);
-                this.setState({
-                    blocks: arraySplice(blocks, focus.idx, 1, ...replaceElt),
-                    focus: {
-                        index: focus.idx+1,
-                        offset: 0
-                    },
-                    anchor: null
-                })
-    
-                return;
-            }
-            else if (type === "Range") {
+            let undo = [...this.state.undo];
+            undo.push({blocks: [...this.state.blocks], focus: this.state.focus});
+
+            const [earlier, later] = compareBaseExtendPos(focus, anchor)
                 
-                if (focus.idx === anchor.idx) {
-                    this.setState(pre => {
-                        const replaceElt = [blocks[focus.idx].slice(0, Math.min(focus.offset, anchor.offset)), blocks[focus.idx].slice(Math.max(focus.offset, anchor.offset))]
-                        
-                        return {
-                            blocks: arraySplice(blocks, focus.idx, 1, ...replaceElt),
-                            focus: {index: focus.idx, offset: Math.min(focus.offset, anchor.offset)},
-                            anchor: null
-                        }
-                    })
-                } else {
-                    const earlier = focus.idx < anchor.idx ? focus : anchor;
-                    const later = focus.idx < anchor.idx ? anchor : focus;
-                    
-                    this.setState(pre => {
-                        const replaceElt = [blocks[earlier.idx].slice(0, earlier.offset), blocks[later.idx].slice(later.offset)]
-                        
-                        return {
-                            blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, ...replaceElt),
-                            focus: {index: earlier.idx+1, offset: 0},
-                            anchor: null
-                        }
-                    })
-                }
-                
-                return;
-            }
+            const replaceElt = [
+                blocks[earlier.idx].slice(0, earlier.offset), blocks[later.idx].slice(later.offset)
+            ]
+
+            this.setState({
+                blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, ...replaceElt),
+                focus: {index: earlier.idx+1, offset: 0},
+                anchor: null,
+                undo: undo
+            });
+
+            return;
         }
         case "Backspace": case "Delete": {
+            event.preventDefault();
             let undo = [...this.state.undo];
             undo.push({
                 blocks: [...this.state.blocks],
-                focus: this.state.focus ? {...this.state.focus} : {index: 0, offset: 0},
+                focus: this.state.focus,
             })
 
-            this.setState({undo: undo})
-            if (window.getSelection().type === "Caret") {
+            this.setState({undo: undo, anchor: null})
+            if (type === "Caret") {
                 if (event.key === "Backspace") {
                     if (focusNode.nodeType === 1 && focus.offset === 0) {
-                        event.preventDefault();
                         if (focus.idx === 0) return;
                         
                         this.setState({
                             blocks: arraySplice(blocks, focus.idx-1, 2, blocks[focus.idx-1]+blocks[focus.idx]),
                             focus: {index: focus.idx-1, offset: focus.prev.len},
-                            anchor: null
                         })
                     } else {
-                        event.preventDefault();
                         this.setState({
-                            blocks: arraySplice(blocks, focus.idx, 1, strSplice(blocks[focus.idx], focus.offset-1, 1, "")),
+                            blocks: arraySplice(blocks, focus.idx, 1, strSplice(blocks[focus.idx], focus.offset-1, 1)),
                             focus: {index: focus.idx, offset: focus.offset-1},
-                            anchor: null
-
                         })
                     }
                 } else {
                     if (focus.offset === focus.len && blocks[focus.idx+1]) {
-                        event.preventDefault();
-                        this.setState(pre => ({
+                        this.setState({
                             blocks: arraySplice(blocks, focus.idx, 2, blocks[focus.idx]+blocks[focus.idx+1]),
                             focus: {index: focus.idx, offset: focus.offset},
-                            anchor: null
-
-                        }))
+                        })
+                    } else {
+                        this.setState({
+                            blocks: arraySplice(blocks, focus.idx, 1, strSplice(blocks[focus.idx], focus.offset, 1)),
+                            focus: {index: focus.idx, offset: focus.offset},
+                        })
                     }
                 }
-    
+                return;
             } 
-            else {
-                event.preventDefault();
-                if (focus.idx === anchor.idx) {
-                    this.setState(pre => {
-                        const replaceElt = blocks[focus.idx].slice(0, Math.min(focus.offset, anchor.offset)) + blocks[focus.idx].slice(Math.max(focus.offset, anchor.offset))
-                        return {
-                            blocks: arraySplice(blocks, focus.idx, 1, replaceElt),
-                            focus: {index: focus.idx, offset: Math.min(focus.offset, anchor.offset)},
-                            anchor: null
-                        }
-                    })
-                } else {
-                    const earlier = focus.idx < anchor.idx ? focus : anchor;
-                    const later = focus.idx < anchor.idx ? anchor : focus;
-                    
-                    this.setState(pre => {
-                        const replaceElt = blocks[earlier.idx].slice(0, earlier.offset) + blocks[later.idx].slice(later.offset)
-                        return {
-                            blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt),
-                            focus: {index: earlier.idx, offset: earlier.offset},
-                            anchor: null
-                        }
-                    })
-                }
-            }
+            const [earlier, later] = compareBaseExtendPos(focus, anchor)
+
+            const replaceElt = blocks[earlier.idx].slice(0, earlier.offset) + blocks[later.idx].slice(later.offset)
+
+            this.setState({
+                blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt),
+                focus: {index: earlier.idx, offset: earlier.offset},
+            })
+
             return;
         }
         }
@@ -483,6 +392,8 @@ class Suture extends React.Component{
     }
     componentDidUpdate() {
         let {focus, anchor} = this.state
+        if (!focus) focus = {index: 0, offset: 0};
+
         const blockElts = this.ref.current.childNodes
         const focusSel = offsetFromParent(blockElts[focus.index], focus.offset);
 
