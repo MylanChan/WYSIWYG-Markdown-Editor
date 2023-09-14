@@ -146,12 +146,40 @@ class Suture extends React.Component{
         })
     }
 
+    handlePasteDrop(event) {
+        event.preventDefault();
+        const {blocks} = this.state;
+        const focus = getBlockAllInfo(event.target);
+
+        let state = {};
+
+        state.undo = [...this.state.undo];
+        state.undo.push({blocks: [...this.state.blocks], focus: this.state.focus});
+
+        let data;
+        if (event.nativeEvent instanceof ClipboardEvent) {
+            data = event.clipboardData.getData("Text").split(/\r?\n/);
+        }
+        else if (event.nativeEvent instanceof DragEvent) {
+            data = event.dataTransfer.getData("Text").split(/\r?\n/);
+        }
+
+        data[0] = focus.element.textContent + data[0];
+
+        state.blocks = arraySplice(blocks, focus.idx, 1, ...data);
+        
+        state.focus = {index: data.length-focus.idx-1, offset: data[data.length-1].length};
+        state.anchor = null;
+
+        return this.setState(state);
+    }
+
     handleClick(event) {
         // IMPORTANT
         // event.target is not same as window.getSelection().focusNode
         // To be conventional, use focusNode instead
         const {focusNode, focusOffset} = window.getSelection();
-        if (event.target.nodeType === 1 && event.target.tagName === "INPUT") {
+        if (event.target.nodeType === 1 || event.target.tagName === "INPUT") {
             return
         }
         if (window.getSelection().type === "Range") return;
@@ -178,6 +206,9 @@ class Suture extends React.Component{
         const {blocks} = this.state;
         
         const {type, focusNode, anchorNode, anchorOffset} = window.getSelection();
+
+        if (focusNode.nodeType === 1 && focusNode.classList.contains("editor")) return;
+
         const focus = getBlockAllInfo(focusNode);
         const anchor = getBlockAllInfo(anchorNode, anchorOffset);
 
@@ -377,8 +408,14 @@ class Suture extends React.Component{
     }
 
     handleSelect(event) {
+        console.log(event)
+
         if (event.nativeEvent instanceof MouseEvent) {
+
             const {focusNode, anchorNode, anchorOffset} = window.getSelection();
+            
+            if (focusNode.nodeType === 1 && focusNode.classList.contains("editor")) return;
+
             const focus = getBlockAllInfo(focusNode);
             const anchor = getBlockAllInfo(anchorNode, anchorOffset);
 
@@ -457,7 +494,9 @@ class Suture extends React.Component{
     
                 onKeyDown={this.handleKeyDown.bind(this)}
                 onCompositionEnd={this.handleCompositionEnd.bind(this)}
+                onPaste={this.handlePasteDrop.bind(this)}
                 onClick={this.handleClick.bind(this)}
+                onDrop={this.handlePasteDrop.bind(this)}
                 onSelect={this.handleSelect.bind(this)}
             >
                 {parser(this.state.blocks.join("\r\n"))}
