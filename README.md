@@ -1,6 +1,6 @@
 # WYSIWYG Markdown Editor
 
-![Preview GIF](./public/preview.gif)
+![Preview GIF](./asserts/preview.gif)
 
 Supported style:
 
