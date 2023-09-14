@@ -222,87 +222,78 @@ class Suture extends React.Component{
         }
         case "ArrowLeft": {
             event.preventDefault();
-
-            this.setState({
-                anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-            })
+            
+            let state = {};
+            state.anchor = event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null; 
             
             if (type === "Range" && !event.shiftKey) {
                 const [earlier,] = compareBaseExtendPos(focus, anchor)
-
-                this.setState({
-                    focus: {index: earlier.idx, offset: earlier.offset},
-                })
+                
+                state.focus = {index: earlier.idx, offset: earlier.offset};
+                return this.setState(state);
             }
-            else if (focus.offset === 0) {
+            
+            if (focus.offset === 0) {
                 if (focus.idx === 0) return;
-                this.setState({
-                    focus: {index: focus.idx-1, offset: focus.prev.len},
-                })   
+                
+                state.focus = {index: focus.idx-1, offset: focus.prev.len};
+                return this.setState(state);
             }
-            else {
-                this.setState({
-                    focus: {index: focus.idx, offset: focus.offset-1},
-                })
-            }
-    
-            return;
+
+            state.focus = {index: focus.idx, offset: focus.offset-1};
+
+            return this.setState(state);
         }
         case "ArrowRight": {
             event.preventDefault();
+            
+            let state = {};
+            state.anchor = event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null;
 
             if (type === "Range" && !event.shiftKey) {
-                const [, later] = compareBaseExtendPos(focus, anchor)
-
-                this.setState({
-                    focus: {index: later.idx, offset: later.offset},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-                })
-            } else if (focus.offset === focus.len) {
-                if (focus.idx === this.ref.current.childNodes.length-1) return
-                this.setState({
-                    focus: {index: focus.idx+1, offset: 0},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-                })
-            } else {
-                this.setState({
-                    focus: {index: focus.idx, offset: focus.offset+1},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null
-                })
+                const [, later] = compareBaseExtendPos(focus, anchor);
+                
+                state.focus = {index: later.idx, offset: later.offset};
+                return this.setState(state);
             }
-    
-            return;
+            
+            if (focus.offset === focus.len) {
+                if (focus.idx === this.ref.current.childNodes.length-1) return
+                
+                state.focus = {index: focus.idx+1, offset: 0};
+                return this.setState(state);
+            }
+
+            state.focus = {index: focus.idx, offset: focus.offset+1};
+            return this.setState(state);
         }
         case "ArrowUp": {
             event.preventDefault();
+            
+            let state = {};
+            state.anchor = event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null;
+
             if (focus.idx === 0) {
-                this.setState({
-                    focus: {index: focus.idx, offset: 0},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
-                })
-            } else {
-                this.setState(pre => ({
-                    focus: {index: focus.idx-1, offset: Math.max(pre.focus.offset, focus.offset)},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
-                }))
-            } 
-    
-            return;
+                state.focus = {index: focus.idx, offset: 0};
+                return this.setState(state);
+            }
+
+            state.focus = {index: focus.idx-1, offset: this.state.focus.offset};
+            return this.setState(state);
         }
         case "ArrowDown": {
             event.preventDefault();
+           
+            let state = {};
+            state.anchor = event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null;
+
             if (focus.idx === event.target.childNodes.length - 1) {
-                this.setState({
-                    focus: {index: focus.idx, offset: focus.len},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
-                })
-            } else {
-                this.setState(pre => ({
-                    focus: {index: focus.idx+1, offset: Math.max(pre.focus.offset, focus.offset)},
-                    anchor: event.shiftKey ? {index: anchor.idx, offset: anchor.offset} : null,
-                }))
+                state.focus = {index: focus.idx, offset: focus.len};
+                return this.setState(state);
             }
-            return;
+
+            state.focus = {index: focus.idx+1, offset: this.state.focus.offset};
+            return this.setState(state);
         }
         case "Enter": {
             event.preventDefault();
@@ -325,55 +316,62 @@ class Suture extends React.Component{
 
             return;
         }
-        case "Backspace": case "Delete": {
+        case "Backspace": {
             event.preventDefault();
-            let undo = [...this.state.undo];
-            undo.push({
-                blocks: [...this.state.blocks],
-                focus: this.state.focus,
-            })
 
-            this.setState({undo: undo, anchor: null})
+            let state = {anchor: null, undo: [...this.state.undo]};
+            state.undo.push({blocks: [...this.state.blocks], focus: this.state.focus});
+
             if (type === "Caret") {
-                if (event.key === "Backspace") {
-                    if (focusNode.nodeType === 1 && focus.offset === 0) {
-                        if (focus.idx === 0) return;
-                        
-                        this.setState({
-                            blocks: arraySplice(blocks, focus.idx-1, 2, blocks[focus.idx-1]+blocks[focus.idx]),
-                            focus: {index: focus.idx-1, offset: focus.prev.len},
-                        })
-                    } else {
-                        this.setState({
-                            blocks: arraySplice(blocks, focus.idx, 1, strSplice(blocks[focus.idx], focus.offset-1, 1)),
-                            focus: {index: focus.idx, offset: focus.offset-1},
-                        })
-                    }
-                } else {
-                    if (focus.offset === focus.len && blocks[focus.idx+1]) {
-                        this.setState({
-                            blocks: arraySplice(blocks, focus.idx, 2, blocks[focus.idx]+blocks[focus.idx+1]),
-                            focus: {index: focus.idx, offset: focus.offset},
-                        })
-                    } else {
-                        this.setState({
-                            blocks: arraySplice(blocks, focus.idx, 1, strSplice(blocks[focus.idx], focus.offset, 1)),
-                            focus: {index: focus.idx, offset: focus.offset},
-                        })
-                    }
+                if (focusNode.nodeType === 1 && focus.offset === 0) {
+                    if (focus.idx === 0) return;
+                    
+                    const replaceElt = blocks[focus.idx-1]+blocks[focus.idx];
+                    state.blocks = arraySplice(blocks, focus.idx-1, 2, replaceElt);
+
+                    state.focus = {index: focus.idx-1, offset: focus.prev.len};
+                    return this.setState(state);
                 }
-                return;
+                
+                const replaceElt = strSplice(blocks[focus.idx], focus.offset-1, 1);
+                state.blocks = arraySplice(blocks, focus.idx, 1, replaceElt);
+
+                state.focus = {index: focus.idx, offset: focus.offset-1}; 
+                return this.setState(state);
             } 
+
             const [earlier, later] = compareBaseExtendPos(focus, anchor)
 
             const replaceElt = blocks[earlier.idx].slice(0, earlier.offset) + blocks[later.idx].slice(later.offset)
+            state.blocks = arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt);
 
-            this.setState({
-                blocks: arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt),
-                focus: {index: earlier.idx, offset: earlier.offset},
-            })
+            state.focus = {index: earlier.idx, offset: earlier.offset};
+            return this.setState(state);
+        }
+        case "Delete": {
+            let state = {anchor: null, undo: [...this.state.undo]};
 
-            return;
+            if (type === "Caret") {
+                if (focus.offset === focus.len && blocks[focus.idx+1]) {
+                    state.blocks = arraySplice(blocks, focus.idx, 2, blocks[focus.idx]+blocks[focus.idx+1]);
+                    
+                    state.focus = {index: focus.idx, offset: focus.offset};
+                    return this.setState(state);
+                }
+
+                state.blocks = arraySplice(blocks, focus.idx, 1, strSplice(blocks[focus.idx], focus.offset, 1));
+                
+                state.focus = {index: focus.idx, offset: focus.offset};
+                return this.setState(state);
+            }
+
+            const [earlier, later] = compareBaseExtendPos(focus, anchor)
+
+            const replaceElt = blocks[earlier.idx].slice(0, earlier.offset) + blocks[later.idx].slice(later.offset)
+            state.blocks = arraySplice(blocks, earlier.idx, later.idx-earlier.idx+1, replaceElt);
+            
+            state.focus = {index: earlier.idx, offset: earlier.offset}
+            return this.setState(state);
         }
         }
     }
