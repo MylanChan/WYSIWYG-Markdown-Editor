@@ -27,37 +27,37 @@ p, h1, h2, h3, h4, h5, h6 {
 .editor > * {
   min-height: 30px;
 }
-.editor > * > .style:not(.act) :first-child, .editor > * > .style:not(.act) :last-child {
+.editor > * > .style:not(.act):not(:has(img)) :first-child, .editor > * > .style:not(.act):not(:has(img)) :last-child {
   display: inline-block;
   overflow-x: hidden;
   width: 0px;
   height: 0px;
 }
 
-p:has(input[type=checkbox]:first-child):has(input + span.act) > :first-child, p:has(input[type=checkbox]:first-child) > :first-child.act {
+.block:has(input[type=checkbox]:first-child):has(input + span.act) > :first-child, .block:has(input[type=checkbox]:first-child) > :first-child.act {
   display: none;
 }
-p:has(input[type=checkbox]:first-child) > input:not(.act) + span:not(.act) {
+.block:has(input[type=checkbox]:first-child) > input:not(.act) + span:not(.act) {
   display: inline-block;
   overflow-x: hidden;
   width: 0px;
   height: 0px;
 }
 
-h1 > :first-child:not(.act), h2 > :first-child:not(.act), h3 > :first-child:not(.act), h4 > :first-child:not(.act), h5 > :first-child:not(.act), h6 > :first-child:not(.act), blockquote > :first-child:not(.act) {
+h1:not(.act) > :first-child:not(.act), h2:not(.act) > :first-child:not(.act), h3:not(.act) > :first-child:not(.act), h4:not(.act) > :first-child:not(.act), h5:not(.act) > :first-child:not(.act), h6:not(.act) > :first-child:not(.act), blockquote:not(.act) > :first-child:not(.act) {
   display: none;
 }
 
-p > span:has(hr).act > hr {
+.block:has(hr):has(hr.act) > hr, .block:has(hr):has(span.act) > hr, .block:has(hr).act > hr {
   display: none;
 }
-p > span:has(hr):not(.act) > span {
+.block:has(hr):not(:has(hr.act)):not(:has(span.act)):not(.act) > span {
   display: none;
 }
 
-span:has(img).act > img {
+.style:has(img).act > img {
   display: none;
 }
-span:has(img):not(.act) > :not(img) {
+.style:has(img):not(.act) > :not(img) {
   display: none;
 }/*# sourceMappingURL=style.css.map */

@@ -28,7 +28,7 @@ p, h1, h2, h3, h4, h5, h6 {
 
     > * {
         min-height: 30px;
-        > .style:not(.act) {
+        > .style:not(.act):not(:has(img)) {
             :first-child, :last-child {
                 display: inline-block;
                 overflow-x: hidden;
@@ -39,7 +39,7 @@ p, h1, h2, h3, h4, h5, h6 {
     }
 }
 
-p:has(input[type=checkbox]:first-child) {
+.block:has(input[type=checkbox]:first-child) {
     &:has(input + span.act) > :first-child, > :first-child.act {
         display: none;
     }
@@ -53,25 +53,25 @@ p:has(input[type=checkbox]:first-child) {
 }
 
 h1, h2, h3, h4, h5, h6, blockquote {
-    > :first-child:not(.act) {
+    &:not(.act) > :first-child:not(.act) {
         display: none
     }
 }
 
-p > span:has(hr) {
-    &.act > hr {
+.block:has(hr) {
+    &:has(hr.act) > hr, &:has(span.act) > hr, &.act >hr {
         display: none
     }
-    &:not(.act) > span {
+    &:not(:has(hr.act)):not(:has(span.act)):not(.act) > span {
         display: none
     }
 }
 
-span:has(img) {
+.style:has(img) {
     &.act > img {
         display: none;
     }
     &:not(.act) > :not(img) {
-        display: none
+        display: none;
     }
 }
