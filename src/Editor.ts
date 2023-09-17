@@ -28,9 +28,9 @@ export class Editor {
             if (!child) return null;
             child = child.nodeType === 1 ? child : child.parentElement;
     
-            const closestElt = (child as HTMLElement).closest(selectors as keyof HTMLElementTagNameMap);
+            const closestElt = (child as HTMLElement).parentElement.closest(selectors as keyof HTMLElementTagNameMap);
     
-            if (closestElt && child !== closestElt) {
+            if (closestElt) {
                 return Editor.Element.farthest(closestElt, selectors);
             }
     
