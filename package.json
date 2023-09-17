@@ -4,7 +4,8 @@
   "description": "WYSIWYG Markdown editor",
   "main": "./src/index.js",
   "scripts": {
-    "test": "react-scripts start"
+    "start": "react-scripts start",
+    "build": "react-scripts build"
   },
   "keywords": [
     "WYSIWYG",
@@ -15,6 +16,7 @@
   "author": "Mylan",
   "license": "MIT",
   "dependencies": {
+    "express": "^4.18.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "^5.0.1"
@@ -30,5 +32,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.21"
   }
 }
